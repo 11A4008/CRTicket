@@ -125,8 +125,8 @@
         </el-form-item>
 
       </el-form>
-      <h3 style="font-family: Consolas,serif">Version 260114</h3>
-      <h3 style="font-family: Consolas,serif">Station Version 10102</h3>
+      <h3 style="font-family: Consolas,serif">Version 260124</h3>
+      <h3 style="font-family: Consolas,serif">Station Version 10105</h3>
     </el-aside>
 
     <el-main class="main-center">
