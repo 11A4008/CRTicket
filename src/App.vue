@@ -125,8 +125,8 @@
         </el-form-item>
 
       </el-form>
-      <h3 style="font-family: Consolas,serif">Version 260124</h3>
-      <h3 style="font-family: Consolas,serif">Station Version 10105</h3>
+      <h3 style="font-family: Consolas,serif">Version 260202</h3>
+      <h3 style="font-family: Consolas,serif">Station Version 10106</h3>
     </el-aside>
 
     <el-main class="main-center">
@@ -412,6 +412,18 @@ const options = [
     label: '二等包座',
   },
   {
+    value: '硬卧代硬座',
+    label: '硬卧代硬座',
+  },
+  {
+    value: '软卧代软座',
+    label: '软卧代软座',
+  },
+  {
+    value: '卧代二等座',
+    label: '卧代二等座',
+  },
+  {
     value: '棚车',
     label: '棚车',
   },
@@ -431,6 +443,7 @@ const disableAirSeats = [
   '高级动卧',
   '一等卧',
   '二等卧',
+  '卧代二等座',
   '棚车',
 ]
 
