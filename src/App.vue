@@ -125,8 +125,11 @@
         </el-form-item>
 
       </el-form>
-      <h3 style="font-family: Consolas,serif">Version 260214</h3>
-      <h3 style="font-family: Consolas,serif">Station Version 10107</h3>
+      <h3 style="font-family: Consolas,serif">Version 260401</h3>
+      <h3 style="font-family: Consolas,serif">Station Version 10108</h3>
+
+      <el-button type="primary" @click="note">更新内容</el-button>
+
     </el-aside>
 
     <el-main class="main-center">
@@ -200,8 +203,8 @@
 
 <script setup>
 import {onMounted, watch, reactive, ref, computed} from 'vue'
-import { ElMessage } from 'element-plus'
-import stationData from '/src/station_name.js' // 你的站点数据
+import {ElMessage, ElNotification} from 'element-plus'
+import stationData from '/src/station_name.js'
 import QRCode from 'qrcode'
 import html2canvas from 'html2canvas'
 import jsPDF from "jspdf";
@@ -244,7 +247,7 @@ const ticket = reactive({
   sellPlace: '',
   gate: '',
   message: '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快',
-  theme: 'EMU_Green.jpg' // 当前主题，并设置默认值
+  theme: 'EMU_Green.jpg' // 默认值
 })
 
 // 搜索逻辑
@@ -477,12 +480,12 @@ const themeOptions = [
   {
     id: 'EMU_Red.jpg',
     label: '经典红',
-    disabled: true, // 假设图片已准备好
+    disabled: true,
   },
   {
     id: 'EMU_Blue.jpg',
     label: '经典蓝',
-    disabled: true, // 假设图片已准备好
+    disabled: true,
   },
   {
     id: 'EMU_Green.jpg',
@@ -553,12 +556,24 @@ watch(() => ticket.number, (newVal) => {
   generateQRCode(newVal)
 })
 
-// 初次加载时生成一次
+// 初次加载时生成QR码并显示更新内容
 onMounted(() => {
   generateQRCode(ticket.number)
+  if (!sessionStorage.getItem('notified')) {
+    note()
+    sessionStorage.setItem('notified', '1')
+  }
 })
 
-const ticketRef = ref(null) // 绑定你的车票外层 div
+const note = () => {
+  ElNotification({
+    title: '车站列表已经更新至10108！',
+    message: '更新内容：更新车站列表至10108；新增柳州-贺州城际铁路站点；加入右上角更新内容通知。',
+    type: 'info'
+  })
+}
+
+const ticketRef = ref(null)
 
 //PDF
 const downloadPDF = async () => {
