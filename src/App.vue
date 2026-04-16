@@ -125,8 +125,8 @@
         </el-form-item>
 
       </el-form>
-      <h3 style="font-family: Consolas,serif">Version 260401</h3>
-      <h3 style="font-family: Consolas,serif">Station Version 10108</h3>
+      <h3 style="font-family: Consolas,serif">Version 260416</h3>
+      <h3 style="font-family: Consolas,serif">Station Version 10109</h3>
 
       <el-button type="primary" @click="note">更新内容</el-button>
 
@@ -194,6 +194,10 @@
             <el-icon><Picture /></el-icon>
             下载 PNG
           </el-button>
+          <el-button type="success" disabled>
+            <el-icon><Checked /></el-icon>
+            存储到账户
+          </el-button>
         </div>
       </el-card>
 
@@ -208,7 +212,7 @@ import stationData from '/src/station_name.js'
 import QRCode from 'qrcode'
 import html2canvas from 'html2canvas'
 import jsPDF from "jspdf";
-import {Document, Picture} from "@element-plus/icons-vue";
+import {Checked, Document, Picture} from "@element-plus/icons-vue";
 import { Check, Close } from '@element-plus/icons-vue'
 
 //解析站点数据
@@ -567,8 +571,8 @@ onMounted(() => {
 
 const note = () => {
   ElNotification({
-    title: '车站列表已经更新至10108！',
-    message: '更新内容：更新车站列表至10108；加入右上角更新内容通知。',
+    title: '车站列表已经更新至10109！',
+    message: '更新内容：更新车站列表至10109；更新README中的未来规划；热烈祝贺大瑞铁路蒲缥站开通客运业务。',
     type: 'info'
   })
 }
