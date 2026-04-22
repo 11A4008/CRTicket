@@ -256,6 +256,12 @@
     gap: 20px;              /* 两个按钮的间距 */
 }
 
+/*历史按钮*/
+.user-top-right {
+    position: absolute;
+    top: 1%;
+    right: 1%;
+}
 /* 在缩小时等比例缩放所有内容 */
 @media (max-width: 800px) {
     .ticket-container {
