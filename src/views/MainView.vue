@@ -202,10 +202,15 @@
             <el-icon><Picture /></el-icon>
             下载 PNG
           </el-button>
-          <el-button type="success" disabled>
-            <el-icon><Checked /></el-icon>
-            存储到账户
-          </el-button>
+          <el-tooltip
+              content="该功能开发中..."
+              placement="bottom-start"
+          >
+            <el-button type="success" disabled>
+              <el-icon><Checked /></el-icon>
+              存储到账户
+            </el-button>
+          </el-tooltip>
         </div>
       </el-card>
 
