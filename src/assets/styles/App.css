@@ -39,14 +39,14 @@
 /* 文字区域 */
 @font-face {
     font-family: "FZCDXK";
-    src: url("public/FZCDXK.TTF") format("truetype");
+    src: url("/FZCDXK.TTF") format("truetype");
     font-weight: normal;
     font-style: normal;
 }
 
 @font-face {
     font-family: "OCRB";
-    src: url("public/OCRB.ttf") format("truetype");
+    src: url("/OCRB.ttf") format("truetype");
     font-weight: normal;
     font-style: normal;
 }
@@ -247,6 +247,22 @@
     font-family: SimSun, sans-serif;
     font-weight: bold;
     font-size: 14px;
+}
+
+.ticket-type {
+    position: absolute;
+    top: 46%;
+    left: 50%;
+    font-size: 20px;
+}
+
+.credit {
+    position: absolute;
+    top: 47.25%;
+    left: 51%;
+    font-size: 14px;
+    font-family: "SimSun", serif;
+    font-weight: bold;
 }
 
 .download-buttons {

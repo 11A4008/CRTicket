@@ -71,6 +71,15 @@
           <el-input-number v-model="ticket.price" placeholder="请输入数字" :min="0" :step="0.5"></el-input-number>
         </el-form-item>
 
+        <el-form-item label="使用积分">
+          <el-switch
+              v-model="credit"
+              inline-prompt
+              :active-icon="Check"
+              :inactive-icon="Close"
+          />
+        </el-form-item>
+
         <el-form-item label="席位名称">
           <el-select
               v-model="ticket.seatType"
@@ -133,7 +142,7 @@
         </el-form-item>
 
       </el-form>
-      <h3 style="font-family: Consolas,serif">Version 260416</h3>
+      <h3 style="font-family: Consolas,serif">Version 260426</h3>
       <h3 style="font-family: Consolas,serif">Station Version 10109</h3>
 
       <el-button type="primary" @click="note">更新内容</el-button>
@@ -183,6 +192,9 @@
             <div class="ticket-message">
               <p>{{ ticket.message }}</p>
             </div>
+
+            <div class="ticket-type">{{ specialTicketType }}</div>
+            <div class="credit">{{ useCredit}}</div>
 
             <div class="ticket-qrcode" v-if="qrCodeUrl">
               <img :src="qrCodeUrl" alt="QR Code" />
@@ -452,6 +464,19 @@ const options = [
 
 const value3 = ref(false)
 
+const credit = ref(false)
+const specialTicketType = computed(() => {
+  if (credit.value) {
+    return `◯`
+  }
+})
+
+const useCredit = computed(() => {
+  if (credit.value) {
+    return `赠`
+  }
+})
+
 const disableAirSeats = [
   '二等座',
   '一等座',
@@ -589,9 +614,10 @@ onMounted(() => {
 
 const note = () => {
   ElNotification({
-    title: '车站列表已经更新至10109！',
-    message: '更新内容：更新车站列表至10109；更新README中的未来规划；热烈祝贺大瑞铁路蒲缥站开通客运业务。',
-    type: 'info'
+    title: '加入了积分兑换车票的标志！',
+    message: '更新内容：加入“使用积分”开关；加入“历史记录”按钮（未启用）。',
+    type: 'info',
+    position: "bottom-right"
   })
 }
 
@@ -599,8 +625,8 @@ const ticketRef = ref(null)
 
 //PDF
 const downloadPDF = async () => {
-  if (!ticket.number) {
-    ElMessage.warning("请先填写票号");
+  if (!(ticket.number && ticket.date && ticket.from && ticket.to && ticket.price && ticket.seatNo && ticket.seatType && ticket.time && ticket.trainNo)) {
+    ElMessage.warning("请填写所有必填项");
     return;
   }
 
@@ -621,8 +647,8 @@ const downloadPDF = async () => {
 
 // 下载 PNG
 const downloadPNG = async () => {
-  if (!ticket.number) {
-    ElMessage.warning("请先填写票号");
+  if (!(ticket.number && ticket.date && ticket.from && ticket.to && ticket.price && ticket.seatNo && ticket.seatType && ticket.time && ticket.trainNo)) {
+    ElMessage.warning("请填写所有必填项");
     return;
   }
 

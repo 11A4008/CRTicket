@@ -98,6 +98,17 @@
                     </el-col>
 
                     <el-col :span="12">
+                      <el-form-item label="使用积分">
+                        <el-switch
+                            v-model="credit"
+                            inline-prompt
+                            :active-icon="Check"
+                            :inactive-icon="Close"
+                        />
+                      </el-form-item>
+                    </el-col>
+
+                    <el-col :span="12">
                       <el-form-item label="席位名称">
                         <el-select v-model="ticket.seatType" placeholder="Select">
                           <el-option
@@ -140,19 +151,7 @@
                       </el-form-item>
                     </el-col>
 
-                    <!-- 提示语单独占一行 -->
-                    <el-col :span="24">
-                      <el-form-item label="提示语">
-                        <el-input
-                            v-model="ticket.message"
-                            :rows="3"
-                            type="textarea"
-                            placeholder="输入提示语"
-                        />
-                      </el-form-item>
-                    </el-col>
-
-                    <el-col :span="24">
+                    <el-col :span="12">
                       <el-form-item label="选择背景">
                         <el-select v-model="ticket.theme" placeholder="请选择主题" style="width: 240px">
                           <el-option
@@ -163,6 +162,18 @@
                               :disabled="item.disabled"
                           />
                         </el-select>
+                      </el-form-item>
+                    </el-col>
+
+                    <!-- 提示语单独占一行 -->
+                    <el-col :span="24">
+                      <el-form-item label="提示语">
+                        <el-input
+                            v-model="ticket.message"
+                            :rows="3"
+                            type="textarea"
+                            placeholder="输入提示语"
+                        />
                       </el-form-item>
                     </el-col>
                   </el-row>
@@ -248,7 +259,7 @@
 import {useRouter} from "vue-router";
 import {computed, reactive, ref, watch} from "vue";
 import { useTransition } from '@vueuse/core'
-import {CloseBold, Delete, DocumentAdd, Download, Edit} from "@element-plus/icons-vue";
+import {Check, Close, CloseBold, Delete, DocumentAdd, Download, Edit} from "@element-plus/icons-vue";
 import {
   ElButton,
   ElIcon, ElMessage, ElMessageBox,
@@ -483,6 +494,7 @@ const options = [
 ]
 
 const value3 = ref(false)
+const credit = ref(false)
 
 const disableAirSeats = [
   '二等座',
