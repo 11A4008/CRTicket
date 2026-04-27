@@ -3,6 +3,7 @@ import MainView from '../views/MainView.vue'
 import HistoryView from '../views/HistoryView.vue'
 import Login from "@/views/Login.vue";
 import Register from "@/views/Register.vue";
+import Debug from "@/views/Debug.vue";
 
 const routes = [
     {
@@ -20,6 +21,10 @@ const routes = [
     {
         path: '/register',
         component: Register
+    },
+    {
+        path: '/debug',
+        component: Debug
     }
 ]
 
