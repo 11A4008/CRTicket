@@ -194,7 +194,7 @@
                 <el-avatar :size="120" src="Picture1.png" />
 
                 <div class="card-content">
-                  <h1>Hi, XXX</h1>
+                  <h1>Hi, {{ username }}</h1>
                   <p>
                     你今年已经运转了
                     <span class="highlight">{{ Math.floor(tripsVal) }}</span> 次，
@@ -267,7 +267,7 @@
 
 <script setup>
 import {useRouter} from "vue-router";
-import {computed, reactive, ref, watch} from "vue";
+import {computed, onMounted, reactive, ref, watch} from "vue";
 import { useTransition } from '@vueuse/core'
 import {Check, Close, CloseBold, Delete, DocumentAdd, Download, Edit, User} from "@element-plus/icons-vue";
 import {
@@ -719,6 +719,19 @@ const deleteHistory = () => {
         })
       })
 }
+
+const username = ref("");
+
+onMounted(() => {
+
+  // 读取 localStorage
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  if (user) {
+    username.value = user.username;
+  }
+
+});
 
 </script>
 

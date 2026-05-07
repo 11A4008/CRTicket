@@ -117,6 +117,11 @@ function handleSubmit() {
   api.post("/user/login", { username: username.value, password: password.value })
       .then(response => {
         if (response.data.success) {
+          localStorage.setItem(
+              "user",
+              JSON.stringify(response.data.user)
+          );
+
           ElMessage.success("登录成功！");
           router.push("/history"); // 跳转到历史记录页面
           loginValue.value = !loginValue.value;

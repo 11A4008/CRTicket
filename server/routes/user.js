@@ -1,6 +1,7 @@
 import express from "express";
 const router = express.Router();
 import db from "../db/db.js";
+import bcrypt from "bcryptjs";
 
 // 注册接口
 router.post("/register", (req, res) => {
@@ -29,14 +30,29 @@ router.post("/register", (req, res) => {
 router.post("/login", (req, res) => {
     const { username, password } = req.body;
 
+    // 查询用户
     const user = db.prepare(`
-        SELECT * FROM users WHERE username = ? AND password = ?
-    `).get(username, password);
+        SELECT * FROM users WHERE username = ?
+    `).get(username);
 
-    if (user) {
+    // 用户不存在
+    if (!user) {
+        return res.json({
+            success: false,
+            message: "用户名或密码错误"
+        });
+    }
+
+    // 验证密码
+    const isValid = bcrypt.compareSync(password, user.password);
+
+    if (isValid) {
         res.json({
             success: true,
-            user: { id: user.id, username: user.username }
+            user: {
+                id: user.id,
+                username: user.username
+            }
         });
     } else {
         res.json({

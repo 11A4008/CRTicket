@@ -218,11 +218,32 @@
               content="该功能开发中..."
               placement="bottom-start"
           >
-            <el-button type="success" disabled>
+            <el-button type="success" @click="saveDistance = true" disabled>
               <el-icon><Checked /></el-icon>
               存储到账户
             </el-button>
           </el-tooltip>
+          <el-dialog
+              v-model="saveDistance"
+              title="运转里程"
+              width="500"
+              :before-close="handleClose"
+          >
+            <span>请输入本次运转的里程数，单位为km。</span>
+            <el-input-number v-model="distance" :min="0">
+              <template #suffix>
+                <span>km</span>
+              </template>
+            </el-input-number>
+            <template #footer>
+              <div class="dialog-footer">
+                <el-button @click="saveDistance = false">我不知道里程</el-button>
+                <el-button type="primary" @click="saveDistance = false">
+                  存储车票
+                </el-button>
+              </div>
+            </template>
+          </el-dialog>
         </div>
       </el-card>
 
@@ -232,7 +253,7 @@
 
 <script setup>
 import {onMounted, watch, reactive, ref, computed} from 'vue'
-import {ElMessage, ElNotification} from 'element-plus'
+import {ElMessage, ElMessageBox, ElNotification} from 'element-plus'
 import stationData from '/src/station_name.js'
 import QRCode from 'qrcode'
 import html2canvas from 'html2canvas'
@@ -277,7 +298,8 @@ const ticket = reactive({
   sellPlace: '',
   gate: '',
   message: '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快',
-  theme: 'EMU_Green.jpg' // 默认值
+  theme: 'EMU_Green.jpg', // 默认值
+  distance: ''
 })
 
 // 搜索逻辑
@@ -477,6 +499,8 @@ const useCredit = computed(() => {
   }
 })
 
+const distance = ref(0)
+
 const disableAirSeats = [
   '二等座',
   '一等座',
@@ -666,6 +690,18 @@ const downloadPNG = async () => {
 const router = useRouter()
 const goToHistory = () => {
   router.push('/history')
+}
+
+// 存储里程
+const saveDistance = ref(false)
+const handleClose = (done) => {
+  ElMessageBox.confirm('你确定不要存储这张车票？')
+      .then(() => {
+        done()
+      })
+      .catch(() => {
+        // catch error
+      })
 }
 </script>
 
