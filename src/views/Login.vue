@@ -124,7 +124,7 @@ function handleSubmit() {
 
           ElMessage.success("登录成功！");
           router.push("/history"); // 跳转到历史记录页面
-          loginValue.value = !loginValue.value;
+          loginValue.value = true;
         } else {
           ElMessage.error(response.data.message || "登录失败，请重试");
         }

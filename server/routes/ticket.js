@@ -15,8 +15,8 @@ router.post("/add", (req, res) => {
                 price, use_credit,
                 seat_type, has_conditioner,
                 seat_no, sell_place, gate_info,
-                message, theme
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                message, theme, distance
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         stmt.run(
@@ -35,12 +35,18 @@ router.post("/add", (req, res) => {
             t.sell_place,
             t.gate_info,
             t.message,
-            t.theme
+            t.theme,
+            t.distance,
         );
 
         res.json({ success: true, message: "保存成功" });
     } catch (err) {
+        console.log(err)
         res.json({ success: false, message: "保存失败" });
+        /*res.json({
+            success: false,
+            message: err.message
+        });*/
     }
 });
 

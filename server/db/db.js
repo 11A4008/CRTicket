@@ -28,6 +28,7 @@ db.exec(`
                                            gate_info TEXT,
                                            message TEXT,
                                            theme TEXT,
+                                           distance INTEGER,
                                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                            FOREIGN KEY (user_id) REFERENCES users(id)
         );

@@ -237,8 +237,8 @@
             </el-input-number>
             <template #footer>
               <div class="dialog-footer">
-                <el-button @click="saveDistance = false">我不知道里程</el-button>
-                <el-button type="primary" @click="saveDistance = false">
+                <el-button  @click="saveWithoutDistance">我不知道里程</el-button>
+                <el-button type="primary" @click="saveTicket">
                   存储车票
                 </el-button>
               </div>
@@ -261,6 +261,7 @@ import jsPDF from "jspdf";
 import {Checked, Document, Picture, User} from "@element-plus/icons-vue";
 import { Check, Close } from '@element-plus/icons-vue'
 import {useRouter} from "vue-router";
+import api from "@/api.js";
 
 //解析站点数据
 
@@ -500,6 +501,10 @@ const useCredit = computed(() => {
 })
 
 const distance = ref(0)
+const saveWithoutDistance = () => {
+  distance.value = 0
+  saveTicket()
+}
 
 const disableAirSeats = [
   '二等座',
@@ -702,6 +707,90 @@ const handleClose = (done) => {
       .catch(() => {
         // catch error
       })
+}
+
+const getCurrentUser = () => {
+  return JSON.parse(localStorage.getItem("user"))
+}
+
+const saveTicket = async () => {
+  console.log(ticket)
+  console.log(getCurrentUser())
+  if (!(ticket.number &&
+      ticket.date &&
+      ticket.from &&
+      ticket.to &&
+      ticket.price &&
+      ticket.seatNo &&
+      ticket.seatType &&
+      ticket.time &&
+      ticket.trainNo)) {
+
+    ElMessage.warning("请填写完整车票信息")
+    return
+  }
+
+  // 未登录
+  if (!getCurrentUser()) {
+    ElMessage.warning("请先登录")
+    return
+  }
+
+  try {
+
+    const res = await api.post(
+        "http://localhost:3000/api/ticket/add",
+        {
+          user_id: getCurrentUser().id,
+
+          ticket_number: ticket.number,
+          train_no: ticket.trainNo,
+
+          departure_station: ticket.from,
+          arrival_station: ticket.to,
+
+          travel_date: ticket.date,
+          departure_time: ticket.time,
+
+          price: ticket.price,
+
+          use_credit: credit.value ? 1 : 0,
+
+          seat_type: finalSeatType.value,
+
+          has_conditioner: value3.value ? 1 : 0,
+
+          seat_no: ticket.seatNo,
+
+          sell_place: ticket.sellPlace,
+
+          gate_info: ticket.gate,
+
+          message: ticket.message,
+
+          theme: ticket.theme,
+
+          distance: distance.value || 0
+        }
+    )
+
+    if (res.data.success) {
+
+      ElMessage.success("车票保存成功")
+
+      saveDistance.value = false
+
+    } else {
+
+      ElMessage.error(res.data.message)
+
+    }
+
+  } catch (err) {
+    // console.log(err)
+    ElMessage.error("保存失败")
+
+  }
 }
 </script>
 

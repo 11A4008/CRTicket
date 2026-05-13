@@ -298,7 +298,7 @@ const loginValue = computed({
 })
 
 const logout = () => {
-  loginValue.value = !loginValue.value;
+  loginValue.value = false;
   ElMessage({
     message: '登出账户成功',
     type: 'success',
