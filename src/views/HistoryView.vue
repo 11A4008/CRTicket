@@ -99,10 +99,22 @@
                         </el-form-item>
                       </el-col>
 
-                      <el-col :span="12">
+                      <el-col :span="6">
                         <el-form-item label="使用积分">
                           <el-switch
                               v-model="credit"
+                              inline-prompt
+                              :active-icon="Check"
+                              :inactive-icon="Close"
+                          />
+                        </el-form-item>
+                      </el-col>
+
+                      <el-col :span="6">
+                        <el-form-item label="空调选择">
+                          <el-switch
+                              v-model="value3"
+                              :disabled="airSwitchDisabled"
                               inline-prompt
                               :active-icon="Check"
                               :inactive-icon="Close"
@@ -120,18 +132,6 @@
                                 :value="item.value"
                             />
                           </el-select>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="空调选择">
-                          <el-switch
-                              v-model="value3"
-                              :disabled="airSwitchDisabled"
-                              inline-prompt
-                              :active-icon="Check"
-                              :inactive-icon="Close"
-                          />
                         </el-form-item>
                       </el-col>
 
@@ -167,6 +167,12 @@
                         </el-form-item>
                       </el-col>
 
+                      <el-col :span="12">
+                        <el-form-item label="里程">
+                          <el-input-number v-model="ticket.distance" placeholder="请输入数字" :min="0"></el-input-number>
+                        </el-form-item>
+                      </el-col>
+
                       <!-- 提示语单独占一行 -->
                       <el-col :span="24">
                         <el-form-item label="提示语">
@@ -184,7 +190,7 @@
                   <template #footer>
                     <div class="dialog-footer">
                       <el-button @click="dialogFormVisible1 = false">Cancel</el-button>
-                      <el-button type="primary" @click="dialogFormVisible1 = false">
+                      <el-button type="primary" @click="saveTicket()">
                         Confirm
                       </el-button>
                     </div>
@@ -278,6 +284,7 @@ import dayjs from 'dayjs';
 import {Timer} from '@element-plus/icons-vue'
 import stationData from "../station_name.js";
 import {useUserStore} from "@/stores/user.js";
+import api from "@/api.js";
 
 const router = useRouter()
 const goHome = () => {
@@ -289,6 +296,10 @@ const goLogin = () => {
 }
 
 const userStore = useUserStore()
+
+const getCurrentUser = () => {
+  return JSON.parse(localStorage.getItem("user"))
+}
 
 userStore.init()
 
@@ -314,7 +325,7 @@ const distance = ref(0)
 const money = ref(0)
 
 // 车票补登相关
-const dialogFormVisible1 = ref(false)
+const dialogFormVisible1 = ref(0)
 const ticket = reactive({
   number: '',
   from: '',
@@ -328,7 +339,8 @@ const ticket = reactive({
   sellPlace: '',
   gate: '',
   message: '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快',
-  theme: 'EMU_Green.jpg' // 默认值
+  theme: 'EMU_Green.jpg', // 默认值
+  distance: '',
 })
 
 const stations = (() => {
@@ -732,6 +744,87 @@ onMounted(() => {
   }
 
 });
+
+const saveDistance = ref(false)
+const saveTicket = async () => {
+  // console.log(ticket)
+  // console.log(getCurrentUser())
+  if (!(ticket.number &&
+      ticket.date &&
+      ticket.from &&
+      ticket.to &&
+      ticket.price &&
+      ticket.seatNo &&
+      ticket.seatType &&
+      ticket.time &&
+      ticket.trainNo)) {
+
+    ElMessage.warning("请填写完整车票信息")
+    return
+  }
+
+  // 未登录
+  if (!getCurrentUser()) {
+    ElMessage.warning("请先登录")
+    return
+  }
+
+  try {
+
+    const res = await api.post(
+        "http://localhost:3000/api/ticket/add",
+        {
+          user_id: getCurrentUser().id,
+
+          ticket_number: ticket.number,
+          train_no: ticket.trainNo,
+
+          departure_station: ticket.from,
+          arrival_station: ticket.to,
+
+          travel_date: ticket.date,
+          departure_time: ticket.time,
+
+          price: ticket.price,
+
+          use_credit: credit.value ? 1 : 0,
+
+          seat_type: finalSeatType.value,
+
+          has_conditioner: value3.value ? 1 : 0,
+
+          seat_no: ticket.seatNo,
+
+          sell_place: ticket.sellPlace,
+
+          gate_info: ticket.gate,
+
+          message: ticket.message,
+
+          theme: ticket.theme,
+
+          distance: distance.value || 0
+        }
+    )
+
+    if (res.data.success) {
+
+      ElMessage.success("车票保存成功")
+
+      saveDistance.value = false
+
+    } else {
+
+      ElMessage.error(res.data.message)
+
+    }
+
+  } catch (err) {
+    // console.log(err)
+    ElMessage.error("保存失败")
+
+  }
+}
 
 </script>
 

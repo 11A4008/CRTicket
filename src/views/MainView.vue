@@ -714,8 +714,8 @@ const getCurrentUser = () => {
 }
 
 const saveTicket = async () => {
-  console.log(ticket)
-  console.log(getCurrentUser())
+  // console.log(ticket)
+  // console.log(getCurrentUser())
   if (!(ticket.number &&
       ticket.date &&
       ticket.from &&
