@@ -202,7 +202,7 @@
                 <div class="card-content">
                   <h1>Hi, {{ username }}</h1>
                   <p>
-                    你今年已经运转了
+                    你已经运转了
                     <span class="highlight">{{ Math.floor(tripsVal) }}</span> 次，
                     <span class="highlight">{{ Math.floor(distanceVal) }}</span> 公里，
                     共消费
@@ -325,7 +325,7 @@ const distance = ref(0)
 const money = ref(0)
 
 // 车票补登相关
-const dialogFormVisible1 = ref(0)
+const dialogFormVisible1 = ref(false)
 const ticket = reactive({
   number: '',
   from: '',
@@ -634,72 +634,21 @@ const formatMoney = (val) => {
   return num % 1 === 0 ? num.toString() : num.toFixed(1)
 }
 
-// 模拟数据加载
-trips.value = 100
-distance.value = 20000
-money.value = 7000
+const tickets = ref([])
 
-const tableData = [
-  {
-    date: '2016-05-03',
-    trainNo: 'G8964',
-    price: '9999',
-    from: '呼和浩特东',
-    to: '八达岭长城',
-    seatType: '新空调硬卧代硬座',
-    seatNo: '02车20号下铺',
-    gate: '检票：上海方向检票口',
-    number: 'E2W114514',
-  },
-  {
-    date: '2016-05-02',
-    trainNo: 'G8964',
-    price: '9999',
-    from: '呼和浩特东',
-    to: '八达岭长城',
-    number: 'E2W114514',
-  },
-  {
-    date: '2016-05-04',
-    trainNo: 'G8964',
-    price: '9999',
-    from: '呼和浩特东',
-    to: '八达岭长城',
-    number: 'E2W114514',
-  },
-  {
-    date: '2016-05-01',
-    trainNo: 'G8964',
-    price: '9999',
-    from: '呼和浩特东',
-    to: '八达岭长城',
-    number: 'E2W114514',
-  },
-  {
-    date: '2016-05-08',
-    trainNo: 'G8964',
-    price: '9999',
-    from: '呼和浩特东',
-    to: '八达岭长城',
-    number: 'E2W114514',
-  },
-  {
-    date: '2016-05-06',
-    trainNo: 'G8964',
-    price: '9999',
-    from: '呼和浩特东',
-    to: '八达岭长城',
-    number: 'E2W114514',
-  },
-  {
-    date: '2016-05-07',
-    trainNo: 'G8964',
-    price: '9999',
-    from: '呼和浩特东',
-    to: '八达岭长城',
-    number: 'E2W114514',
-  },
-]
+const tableData = computed(() =>
+    tickets.value.map((ticket) => ({
+      date: ticket.travel_date || ticket.date || '',
+      trainNo: ticket.train_no || ticket.trainNo || '',
+      price: ticket.price ?? 0,
+      from: ticket.departure_station || ticket.from || '',
+      to: ticket.arrival_station || ticket.to || '',
+      seatType: ticket.seat_type || ticket.seatType || '',
+      seatNo: ticket.seat_no || ticket.seatNo || '',
+      gate: ticket.gate_info || ticket.gate || '',
+      number: ticket.ticket_number || ticket.number || '',
+    }))
+)
 
 // 表格颜色
 const tableRowStyle = ({ rowIndex }) => {
@@ -742,6 +691,8 @@ onMounted(() => {
   if (user) {
     username.value = user.username;
   }
+
+  loadTickets()
 
 });
 
@@ -803,13 +754,16 @@ const saveTicket = async () => {
 
           theme: ticket.theme,
 
-          distance: distance.value || 0
+          distance: Number(ticket.distance) || 0
         }
     )
 
     if (res.data.success) {
 
       ElMessage.success("车票保存成功")
+
+      dialogFormVisible1.value = false
+      await loadTickets()
 
       saveDistance.value = false
 
@@ -825,6 +779,47 @@ const saveTicket = async () => {
 
   }
 }
+
+const loadTickets = async () => {
+
+  if (!getCurrentUser()) return
+
+  try {
+
+    const res = await api.get(
+        `/ticket/list/${getCurrentUser().id}`
+    )
+    
+    tickets.value = Array.isArray(res?.data?.data)
+        ? res.data.data
+        : (Array.isArray(res?.data) ? res.data : [])
+
+    // 运转次数
+    trips.value = tickets.value.length
+
+    // 运转里程
+    distance.value = tickets.value.reduce(
+        (sum, ticket) => sum + (ticket.distance || 0),
+        0
+    )
+
+    // 消费金额（不含积分票）
+    money.value = tickets.value
+        .filter(ticket => ticket.use_credit === 0)
+        .reduce(
+            (sum, ticket) => sum + (ticket.price || 0),
+            0
+        )
+
+  } catch (err) {
+
+    console.log(err)
+
+    ElMessage.error("读取车票失败")
+
+  }
+}
+
 
 </script>
 
