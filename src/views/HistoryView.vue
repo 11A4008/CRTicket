@@ -21,11 +21,11 @@
                 <el-button type="danger" size="large" class="signout-top-right" @click="logout()">
                   <el-icon><CloseBold /></el-icon>登出账户
                 </el-button>
-                <el-button type="success" size="large" class="supplement-bottom-right" @click="dialogFormVisible1 = true">
+                <el-button type="success" size="large" class="supplement-bottom-right" @click="openCreateDialog()">
                   <el-icon><DocumentAdd /></el-icon>补登记录
                 </el-button>
 
-                <el-dialog v-model="dialogFormVisible1" title="补登记录" width="50%">
+                <el-dialog v-model="dialogFormVisible1" :title="isEditMode ? '编辑记录' : '补登记录'" width="50%">
                   <el-form
                       :model="ticket"
                       :rules="rules"
@@ -218,7 +218,7 @@
                 class="table"
                 :row-style="tableRowStyle"
             >
-              <el-table-column prop="date" label="日期" width="120" sortable/>
+              <el-table-column prop="date" label="日期" width="160" sortable/>
               <el-table-column prop="trainNo" label="车次" width="80" />
               <el-table-column prop="price" label="票价" width="80" sortable/>
               <el-table-column prop="from" label="起点" width="120" />
@@ -233,7 +233,7 @@
                       content="下载车票"
                       placement="bottom"
                   >
-                    <el-button type="success">
+                    <el-button type="success" @click="downloadHistoryPNG(scope.row)">
                       <el-icon><Download /></el-icon>
                     </el-button>
                   </el-tooltip>
@@ -241,7 +241,7 @@
                       content="编辑记录"
                       placement="bottom"
                   >
-                    <el-button>
+                    <el-button @click="openEditDialog(scope.row)">
                       <el-icon><Edit /></el-icon>
                     </el-button>
                   </el-tooltip>
@@ -249,13 +249,61 @@
                       content="删除记录"
                       placement="bottom"
                   >
-                    <el-button type="danger" @click="deleteHistory()">
+                    <el-button type="danger" @click="deleteHistory(scope.row)">
                       <el-icon><Delete /></el-icon>
                     </el-button>
                   </el-tooltip>
                 </template>
               </el-table-column>
             </el-table>
+
+            <div class="history-download-render">
+              <div ref="historyTicketRef" class="ticket-container">
+                <div class="ticket-bg" :style="{ backgroundImage: `url(./${downloadTicket.theme})` }">
+                  <div class="ticket-number">{{ downloadTicket.number }}</div>
+                </div>
+
+                <div class="station-block">
+                  <div class="station-left">
+                    <div class="station-name">{{ formatStationName(downloadTicket.from) }}<span class="small">站</span></div>
+                    <div class="station-en">{{ getStationEnglish(downloadTicket.from) }}</div>
+                  </div>
+
+                  <div class="station-middle">
+                    <div class="train-no">{{ downloadTicket.trainNo }}</div>
+                    <div class="arrow">
+                      <span class="line"></span>
+                      <span class="head"></span>
+                    </div>
+                  </div>
+
+                  <div class="station-right">
+                    <div class="station-name">{{ formatStationName(downloadTicket.to) }}<span class="small">站</span></div>
+                    <div class="station-en">{{ getStationEnglish(downloadTicket.to) }}</div>
+                  </div>
+                </div>
+
+                <div class="ticket-gate">{{ downloadTicket.gate }}</div>
+                <div class="date-time">{{ downloadTicket.date }}&nbsp;&nbsp; {{ downloadTicket.time }}开</div>
+                <div class="price">￥{{ downloadTicket.price }}元</div>
+                <div class="tip"><strong>限乘当日当次车</strong></div>
+                <div class="seat">{{ downloadTicket.seatNo }}</div>
+                <div class="seat-class">{{ downloadTicket.seatType }}</div>
+
+                <div class="ticket-message">
+                  <p>{{ downloadTicket.message }}</p>
+                </div>
+
+                <div class="ticket-type">{{ downloadTicket.specialTicketType }}</div>
+                <div class="credit">{{ downloadTicket.useCredit }}</div>
+
+                <div class="ticket-qrcode" v-if="downloadQrCodeUrl">
+                  <img :src="downloadQrCodeUrl" alt="QR Code" />
+                </div>
+
+                <div class="sell-place">{{ downloadTicket.sellPlace }}售</div>
+              </div>
+            </div>
           </div>
           <div v-else>
             <el-empty :image-size="200">
@@ -276,6 +324,8 @@ import {useRouter} from "vue-router";
 import {computed, onMounted, reactive, ref, watch} from "vue";
 import { useTransition } from '@vueuse/core'
 import {Check, Close, CloseBold, Delete, DocumentAdd, Download, Edit, User} from "@element-plus/icons-vue";
+import html2canvas from "html2canvas";
+import QRCode from "qrcode";
 import {
   ElButton,
   ElIcon, ElMessage, ElMessageBox,
@@ -326,6 +376,8 @@ const money = ref(0)
 
 // 车票补登相关
 const dialogFormVisible1 = ref(false)
+const editingTicketId = ref(null)
+const isEditMode = computed(() => editingTicketId.value !== null)
 const ticket = reactive({
   number: '',
   from: '',
@@ -635,18 +687,45 @@ const formatMoney = (val) => {
 }
 
 const tickets = ref([])
+const historyTicketRef = ref(null)
+const downloadQrCodeUrl = ref('')
+const downloadTicket = reactive({
+  number: '',
+  from: '',
+  to: '',
+  trainNo: '',
+  date: '',
+  time: '',
+  price: '',
+  seatType: '',
+  seatNo: '',
+  sellPlace: '',
+  gate: '',
+  message: '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快',
+  theme: 'EMU_Green.jpg',
+  specialTicketType: '',
+  useCredit: '',
+})
 
 const tableData = computed(() =>
     tickets.value.map((ticket) => ({
+      id: ticket.id,
       date: ticket.travel_date || ticket.date || '',
       trainNo: ticket.train_no || ticket.trainNo || '',
+      time: ticket.departure_time || ticket.time || '',
       price: ticket.price ?? 0,
       from: ticket.departure_station || ticket.from || '',
       to: ticket.arrival_station || ticket.to || '',
       seatType: ticket.seat_type || ticket.seatType || '',
+      hasConditioner: ticket.has_conditioner ?? ticket.hasConditioner ?? 0,
       seatNo: ticket.seat_no || ticket.seatNo || '',
       gate: ticket.gate_info || ticket.gate || '',
       number: ticket.ticket_number || ticket.number || '',
+      sellPlace: ticket.sell_place || ticket.sellPlace || '',
+      message: ticket.message || '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快',
+      theme: ticket.theme || 'EMU_Green.jpg',
+      useCredit: ticket.use_credit || 0,
+      distance: ticket.distance ?? 0,
     }))
 )
 
@@ -662,23 +741,174 @@ const formatter = (row, column) => {
   return row.address
 }
 
+const resetTicketForm = () => {
+  ticket.number = ''
+  ticket.from = ''
+  ticket.to = ''
+  ticket.trainNo = ''
+  ticket.date = ''
+  ticket.time = ''
+  ticket.price = ''
+  ticket.seatType = ''
+  ticket.seatNo = ''
+  ticket.sellPlace = ''
+  ticket.gate = ''
+  ticket.message = '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快'
+  ticket.theme = 'EMU_Green.jpg'
+  ticket.distance = ''
+  credit.value = false
+  value3.value = false
+}
+
+const openCreateDialog = () => {
+  editingTicketId.value = null
+  resetTicketForm()
+  dialogFormVisible1.value = true
+}
+
+const openEditDialog = (row) => {
+  if (!row?.id) {
+    ElMessage.error('缺少记录ID，无法编辑')
+    return
+  }
+
+  const seatTypeRaw = row.seatType || ''
+  const seatTypeClean = seatTypeRaw.startsWith('新空调')
+      ? seatTypeRaw.replace(/^新空调/, '')
+      : seatTypeRaw
+
+  editingTicketId.value = row.id
+  ticket.number = row.number || ''
+  ticket.from = row.from || ''
+  ticket.to = row.to || ''
+  ticket.trainNo = row.trainNo || ''
+  ticket.date = row.date || ''
+  ticket.time = row.time || ''
+  ticket.price = row.price ?? ''
+  ticket.seatType = seatTypeClean
+  ticket.seatNo = row.seatNo || ''
+  ticket.sellPlace = row.sellPlace || ''
+  ticket.gate = row.gate || ''
+  ticket.message = row.message || '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快'
+  ticket.theme = row.theme || 'EMU_Green.jpg'
+  ticket.distance = row.distance ?? ''
+
+  credit.value = Number(row.useCredit) === 1
+  value3.value = Number(row.hasConditioner) === 1 || seatTypeRaw.startsWith('新空调')
+
+  dialogFormVisible1.value = true
+}
+
+function normalizeStationName(name) {
+  if (!name) return ''
+  return name.endsWith('站') ? name.slice(0, -1) : name
+}
+
+function formatStationName(name) {
+  const cleanName = normalizeStationName(name)
+  if (!cleanName) return ''
+  const len = cleanName.length
+  if (len === 1) return `　${cleanName}　`
+  if (len === 2) return cleanName[0] + '　' + cleanName[1]
+  return cleanName
+}
+
+function getStationEnglish(name) {
+  const cleanName = normalizeStationName(name)
+  if (!cleanName) return ''
+  if (cleanName === '香港西九龙') return 'HKWestKowloon'
+  const s = stations.find(s => s.name === cleanName)
+  if (!s) return ''
+  return s.en.charAt(0).toUpperCase() + s.en.slice(1)
+}
+
+const generateDownloadQRCode = async (text) => {
+  if (!text) {
+    downloadQrCodeUrl.value = ''
+    return
+  }
+  try {
+    downloadQrCodeUrl.value = await QRCode.toDataURL(
+        text,
+        { width: 300, margin: 1, color: { dark: "#000000", light: "#0000" } }
+    )
+  } catch (err) {
+    downloadQrCodeUrl.value = ''
+  }
+}
+
+const downloadHistoryPNG = async (row) => {
+  if (!(row?.number && row?.date && row?.from && row?.to && row?.price && row?.seatNo && row?.seatType && row?.time && row?.trainNo)) {
+    ElMessage.warning("该记录信息不完整，无法下载")
+    return
+  }
+
+  Object.assign(downloadTicket, {
+    number: row.number,
+    from: row.from,
+    to: row.to,
+    trainNo: row.trainNo,
+    date: row.date,
+    time: row.time,
+    price: row.price,
+    seatType: row.seatType,
+    seatNo: row.seatNo,
+    sellPlace: row.sellPlace,
+    gate: row.gate,
+    message: row.message,
+    theme: row.theme,
+    specialTicketType: row.useCredit ? '◯' : '',
+    useCredit: row.useCredit ? '赠' : '',
+  })
+
+  await generateDownloadQRCode(row.number)
+
+  try {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const element = historyTicketRef.value
+    const canvas = await html2canvas(element, { scale: 2, backgroundColor: null })
+    const imgData = canvas.toDataURL('image/png')
+
+    const link = document.createElement('a')
+    link.href = imgData
+    link.download = `${row.number}.png`
+    link.click()
+  } catch (err) {
+    ElMessage.error('下载失败')
+  }
+}
+
 // 删除项目提示
-const deleteHistory = () => {
-  ElMessageBox.confirm(
-      '此操作将删除这条记录，该过程不可逆！',
-      '删除记录',
-      {
-        confirmButtonText: 'OK',
-        cancelButtonText: 'Cancel',
-        type: 'Danger',
-      }
-  )
-      .then(() => {
-        ElMessage({
-          type: 'success',
-          message: '记录已删除',
-        })
-      })
+const deleteHistory = async (row) => {
+  if (!row?.id) {
+    ElMessage.error('缺少记录ID，无法删除')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+        '此操作将删除这条记录，该过程不可逆！',
+        '删除记录',
+        {
+          confirmButtonText: 'OK',
+          cancelButtonText: 'Cancel',
+          type: 'warning',
+        }
+    )
+
+    const res = await api.delete(`/ticket/delete/${row.id}`)
+
+    if (res?.data?.success) {
+      ElMessage.success('记录已删除')
+      await loadTickets()
+    } else {
+      ElMessage.error(res?.data?.message || '删除失败')
+    }
+  } catch (err) {
+    if (err !== 'cancel' && err !== 'close') {
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 const username = ref("");
@@ -721,49 +951,37 @@ const saveTicket = async () => {
   }
 
   try {
+    const payload = {
+      user_id: getCurrentUser().id,
+      ticket_number: ticket.number,
+      train_no: ticket.trainNo,
+      departure_station: ticket.from,
+      arrival_station: ticket.to,
+      travel_date: ticket.date,
+      departure_time: ticket.time,
+      price: ticket.price,
+      use_credit: credit.value ? 1 : 0,
+      seat_type: finalSeatType.value,
+      has_conditioner: value3.value ? 1 : 0,
+      seat_no: ticket.seatNo,
+      sell_place: ticket.sellPlace,
+      gate_info: ticket.gate,
+      message: ticket.message,
+      theme: ticket.theme,
+      distance: Number(ticket.distance) || 0
+    }
 
-    const res = await api.post(
-        "http://localhost:3000/api/ticket/add",
-        {
-          user_id: getCurrentUser().id,
-
-          ticket_number: ticket.number,
-          train_no: ticket.trainNo,
-
-          departure_station: ticket.from,
-          arrival_station: ticket.to,
-
-          travel_date: ticket.date,
-          departure_time: ticket.time,
-
-          price: ticket.price,
-
-          use_credit: credit.value ? 1 : 0,
-
-          seat_type: finalSeatType.value,
-
-          has_conditioner: value3.value ? 1 : 0,
-
-          seat_no: ticket.seatNo,
-
-          sell_place: ticket.sellPlace,
-
-          gate_info: ticket.gate,
-
-          message: ticket.message,
-
-          theme: ticket.theme,
-
-          distance: Number(ticket.distance) || 0
-        }
-    )
+    const res = isEditMode.value
+        ? await api.post(`/ticket/update/${editingTicketId.value}`, payload)
+        : await api.post("http://localhost:3000/api/ticket/add", payload)
 
     if (res.data.success) {
 
-      ElMessage.success("车票保存成功")
+      ElMessage.success(isEditMode.value ? "记录更新成功" : "车票保存成功")
 
       dialogFormVisible1.value = false
       await loadTickets()
+      editingTicketId.value = null
 
       saveDistance.value = false
 
@@ -774,8 +992,7 @@ const saveTicket = async () => {
     }
 
   } catch (err) {
-    // console.log(err)
-    ElMessage.error("保存失败")
+    ElMessage.error(err?.response?.data?.message || "保存失败")
 
   }
 }
@@ -832,5 +1049,13 @@ html, body {
 
 
 <style scoped>
+@import "../assets/styles/App.css";
 @import "../assets/styles/History.css";
+
+.history-download-render {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  pointer-events: none;
+}
 </style>

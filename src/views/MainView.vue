@@ -1,12 +1,7 @@
 <template>
-  <el-tooltip
-      content="该功能开发中..."
-      placement="bottom-start"
-  >
-    <el-button class="user-top-right" @click="goToHistory()" disabled>
-      <el-icon><User /></el-icon>历史记录
-    </el-button>
-  </el-tooltip>
+  <el-button class="user-top-right" @click="goToHistory()">
+    <el-icon><User /></el-icon>历史记录
+  </el-button>
   <el-container style="height: 100vh">
     <el-aside width="350px" style="background: #f8f9fa; padding: 20px;">
       <h2 style="margin-bottom: 20px; font-family: Roboto,serif">Sam-Lab CR Ticket Maker</h2>
@@ -142,7 +137,7 @@
         </el-form-item>
 
       </el-form>
-      <h3 style="font-family: Consolas,serif">Version 260426</h3>
+      <h3 style="font-family: Consolas,serif">Version 260525</h3>
       <h3 style="font-family: Consolas,serif">Station Version 10109</h3>
 
       <el-button type="primary" @click="note">更新内容</el-button>
@@ -214,15 +209,10 @@
             <el-icon><Picture /></el-icon>
             下载 PNG
           </el-button>
-          <el-tooltip
-              content="该功能开发中..."
-              placement="bottom-start"
-          >
-            <el-button type="success" @click="saveDistance = true" disabled>
-              <el-icon><Checked /></el-icon>
-              存储到账户
-            </el-button>
-          </el-tooltip>
+          <el-button type="success" @click="openSaveDialog">
+            <el-icon><Checked /></el-icon>
+            存储到账户
+          </el-button>
           <el-dialog
               v-model="saveDistance"
               title="运转里程"
@@ -262,6 +252,7 @@ import {Checked, Document, Picture, User} from "@element-plus/icons-vue";
 import { Check, Close } from '@element-plus/icons-vue'
 import {useRouter} from "vue-router";
 import api from "@/api.js";
+import {useUserStore} from "@/stores/user.js";
 
 //解析站点数据
 
@@ -282,6 +273,9 @@ const stations = (() => {
   }
   return list
 })()
+
+const userStore = useUserStore()
+userStore.init()
 
 
 // 数据模型
@@ -699,6 +693,14 @@ const goToHistory = () => {
 
 // 存储里程
 const saveDistance = ref(false)
+const openSaveDialog = () => {
+  if (!userStore.isLogin) {
+    ElMessage.warning("请先登录")
+    return
+  }
+  saveDistance.value = true
+}
+
 const handleClose = (done) => {
   ElMessageBox.confirm('你确定不要存储这张车票？')
       .then(() => {
@@ -710,6 +712,7 @@ const handleClose = (done) => {
 }
 
 const getCurrentUser = () => {
+  if (!userStore.isLogin) return null
   return JSON.parse(localStorage.getItem("user"))
 }
 

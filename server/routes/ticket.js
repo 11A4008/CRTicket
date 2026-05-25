@@ -71,4 +71,66 @@ router.delete("/delete/:id", (req, res) => {
     res.json({ success: true });
 });
 
+const updateTicketHandler = (req, res) => {
+    const id = req.params.id;
+    const t = req.body;
+
+    try {
+        const stmt = db.prepare(`
+            UPDATE tickets SET
+                ticket_number = ?,
+                train_no = ?,
+                departure_station = ?,
+                arrival_station = ?,
+                travel_date = ?,
+                departure_time = ?,
+                price = ?,
+                use_credit = ?,
+                seat_type = ?,
+                has_conditioner = ?,
+                seat_no = ?,
+                sell_place = ?,
+                gate_info = ?,
+                message = ?,
+                theme = ?,
+                distance = ?
+            WHERE id = ? AND user_id = ?
+        `);
+
+        const result = stmt.run(
+            t.ticket_number,
+            t.train_no,
+            t.departure_station,
+            t.arrival_station,
+            t.travel_date,
+            t.departure_time,
+            t.price,
+            t.use_credit,
+            t.seat_type,
+            t.has_conditioner,
+            t.seat_no,
+            t.sell_place,
+            t.gate_info,
+            t.message,
+            t.theme,
+            t.distance,
+            id,
+            t.user_id
+        );
+
+        if (result.changes > 0) {
+            res.json({ success: true, message: "更新成功" });
+        } else {
+            res.json({ success: false, message: "未找到可更新记录" });
+        }
+    } catch (err) {
+        console.log(err);
+        res.json({ success: false, message: "更新失败" });
+    }
+};
+
+// 更新车票（兼容 PUT / POST）
+router.put("/update/:id", updateTicketHandler);
+router.post("/update/:id", updateTicketHandler);
+
 export default router;
