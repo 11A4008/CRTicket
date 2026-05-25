@@ -72,92 +72,49 @@
 
 ## 构建
 
-以下为主要依赖项及其用途说明：
+### 环境要求
 
-- **Vue 核心 API**
+- Node.js：`^20.19.0` 或 `>=22.12.0`
+- npm：建议使用与 Node.js 配套的最新版本
 
-  ```js
-  import { onMounted, watch, reactive, ref } from 'vue'
-  ```
+### 安装依赖
 
-  - `ref` 与 `reactive`：用于定义响应式数据，驱动页面动态更新。
-  - `watch`：监听数据变化，触发相应逻辑。
-  - `onMounted`：在组件挂载后执行初始化逻辑。
+```bash
+npm install
+```
 
-- **Element Plus 组件库**
+### 开发模式（前端）
 
-  ```js
-  import { ElMessage } from 'element-plus'
-  import { Document, Picture } from '@element-plus/icons-vue'
-  ```
+```bash
+npm run dev
+```
 
-  - `ElMessage`：用于全局消息提示，提升用户交互体验。
-  - `Document`、`Picture`：来自 Element Plus 的图标组件，用于界面展示。
+默认启动 Vite 开发服务器（通常为 `http://localhost:5173`）。
 
-- **业务数据**
+### 启动后端服务
 
-  ```js
-  import stationData from '/src/station_name.js'
-  ```
+```bash
+node server/app.js
+```
 
-  - `stationData`：项目自定义的站点数据文件，作为业务逻辑和界面渲染的基础数据源。
+后端默认地址：`http://localhost:3000`，接口前缀如下：
 
-- **二维码生成**
+- `/api/user`
+- `/api/ticket`
 
-  ```js
-  import QRCode from 'qrcode'
-  ```
+### 生产构建
 
-  - 用于将字符串或业务数据生成二维码，便于信息分享或打印。
+```bash
+npm run build
+```
 
-- **页面截图与导出**
+构建产物输出到 `dist/` 目录。
 
-  ```js
-  import html2canvas from 'html2canvas'
-  import jsPDF from 'jspdf'
-  ```
+### 本地预览构建产物
 
-  - `html2canvas`：将页面 DOM 转换为 Canvas 图像。
-  - `jsPDF`：将生成的图像或内容导出为 PDF 文件，实现报表或凭证的下载功能。
-
-### 构建流程
-
-1. **安装依赖**
-   使用包管理工具（推荐 `npm` 或 `yarn`）安装项目依赖：
-
-   ```bash
-   npm install
-   # 或
-   yarn install
-   ```
-
-2. **开发环境启动**
-   启动本地开发服务器，支持热更新：
-
-   ```bash
-   npm run dev
-   ```
-
-3. **生产环境构建**
-   打包优化后的生产版本：
-
-   ```bash
-   npm run build
-   ```
-
-4. **启动后端**
-
-   ```bash
-   cd server
-   node app.js
-   ```
-
-5. **预览构建结果**
-   本地预览打包后的应用：
-
-   ```bash
-   npm run preview
-   ```
+```bash
+npm run preview
+```
 
 ## 提交
 

@@ -242,257 +242,53 @@
 </template>
 
 <script setup>
-import {onMounted, watch, reactive, ref, computed} from 'vue'
-import {ElMessage, ElMessageBox, ElNotification} from 'element-plus'
-import stationData from '/src/station_name.js'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import QRCode from 'qrcode'
 import html2canvas from 'html2canvas'
-import jsPDF from "jspdf";
-import {Checked, Document, Picture, User} from "@element-plus/icons-vue";
-import { Check, Close } from '@element-plus/icons-vue'
-import {useRouter} from "vue-router";
-import api from "@/api.js";
-import {useUserStore} from "@/stores/user.js";
-
-//解析站点数据
-
-const stations = (() => {
-  const list = []
-  const parts = stationData.split('@')
-  for (const item of parts) {
-    if (!item) continue
-    const arr = item.split('|')
-    list.push({
-      code: arr[0],     // 唯一标识符
-      name: arr[1],     // 中文站名
-      telecode: arr[2], // 电报码
-      en: arr[3],       // 拼音全拼
-      abbr: arr[4],     // 拼音首字母
-      city: arr[7],     // 所属城市
-    })
-  }
-  return list
-})()
+import jsPDF from 'jspdf'
+import { Check, Checked, Close, Document, Picture, User } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import api from '@/api.js'
+import { useUserStore } from '@/stores/user.js'
+import {
+  buildTicketPayload,
+  createDefaultTicket,
+  hasRequiredTicketFields,
+  seatOptions,
+  themeOptions,
+  ticketRules,
+} from '@/utils/ticketShared.js'
+import {
+  formatStationName as formatTicketStationName,
+  getStationEnglish as getTicketStationEnglish,
+  handleStationSelect,
+  queryStationSearch,
+  useSeatType,
+} from '@/composables/useTicketShared.js'
 
 const userStore = useUserStore()
 userStore.init()
 
-
-// 数据模型
-
-const ticket = reactive({
-  number: '',
-  from: '',
-  to: '',
-  trainNo: '',
-  date: '',
-  time: '',
-  price: '',
-  seatType: '',
-  seatNo: '',
-  sellPlace: '',
-  gate: '',
-  message: '买票请到12306 发货请到95306\n中国铁路祝您旅途愉快',
-  theme: 'EMU_Green.jpg', // 默认值
-  distance: ''
-})
-
-// 搜索逻辑
-
-function querySearch(queryString, cb) {
-  const results = queryString
-      ? stations.filter(s =>
-          s.name.includes(queryString) ||
-          s.abbr.toLowerCase().includes(queryString.toLowerCase()) ||
-          s.en.toLowerCase().includes(queryString.toLowerCase())
-      )
-      : []
-  cb(
-      results.map(s => ({
-        value: s.name,
-        label: `${s.name} (${s.city})`
-      }))
-  )
-}
-
-// 选中回调
-
-function handleSelect(field, item) {
-  const value = item.value
-  ticket[field] = item.value
-  if (field === 'from' && value === ticket.to) {
-    ElMessage.warning('起点和终点不能相同，请重新选择')
-    ticket.from = value
-    ticket.to = '' // 清空终点
-  } else if (field === 'to' && value === ticket.from) {
-    ElMessage.warning('起点和终点不能相同，请重新选择')
-    ticket.to = value
-    ticket.from = '' // 清空起点
-  } else {
-    ticket[field] = value
-  }
-}
-
-// 引用表单实例
+const ticket = reactive(createDefaultTicket())
 const formRef = ref(null)
+const rules = ticketRules
+const options = seatOptions
 
-// 校验规则
-const rules = {
-  trainNo: [
-    {
-      validator: (rule, value, callback) => {
-        if (!value) {
-          callback(new Error('请输入车次'))
-        } else if (
-            !/^(\d{4}|5\d{4}|[GCDZTKLYS]\d{1,4})$/i.test(value)
-        ) {
-          callback(new Error('请输入正确的车次'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ]
-}
+const {
+  value3,
+  credit,
+  airSwitchDisabled,
+  finalSeatType,
+  specialTicketType,
+  useCreditLabel,
+} = useSeatType(ticket)
 
-const options = [
-  {
-    value: '硬座',
-    label: '硬座',
-  },
-  {
-    value: '软座',
-    label: '软座',
-  },
-  {
-    value: '硬卧',
-    label: '硬卧',
-  },
-  {
-    value: '软卧',
-    label: '软卧',
-  },
-  {
-    value: '二等座',
-    label: '二等座',
-  },
-  {
-    value: '一等座',
-    label: '一等座',
-  },
-  {
-    value: '特等座',
-    label: '特等座',
-  },
-  {
-    value: '优选一等座',
-    label: '优选一等座',
-  },
-  {
-    value: '商务座',
-    label: '商务座',
-  },
-  {
-    value: '无座',
-    label: '无座',
-  },
-  {
-    value: '二等卧',
-    label: '二等卧',
-  },
-  {
-    value: '一等卧',
-    label: '一等卧',
-  },
-  {
-    value: '一等软座',
-    label: '一等软座',
-  },
-  {
-    value: '二等软座',
-    label: '二等软座',
-  },
-  {
-    value: '包厢硬卧',
-    label: '包厢硬卧',
-  },
-  {
-    value: '高级软卧',
-    label: '高级软卧',
-  },
-  {
-    value: '高级动卧',
-    label: '高级动卧',
-  },
-  {
-    value: '混编硬座',
-    label: '混编硬座',
-  },
-  {
-    value: '混编硬卧',
-    label: '混编硬卧',
-  },
-  {
-    value: '特等软座',
-    label: '特等软座',
-  },
-  {
-    value: '动卧',
-    label: '动卧',
-  },
-  {
-    value: '一人软包',
-    label: '一人软包',
-  },
-  {
-    value: '混编软座',
-    label: '混编软座',
-  },
-  {
-    value: '混编软卧',
-    label: '混编软卧',
-  },
-  {
-    value: '多功能座',
-    label: '多功能座',
-  },
-  {
-    value: '二等包座',
-    label: '二等包座',
-  },
-  {
-    value: '硬卧代硬座',
-    label: '硬卧代硬座',
-  },
-  {
-    value: '软卧代软座',
-    label: '软卧代软座',
-  },
-  {
-    value: '卧代二等座',
-    label: '卧代二等座',
-  },
-  {
-    value: '棚车',
-    label: '棚车',
-  },
-]
-
-const value3 = ref(false)
-
-const credit = ref(false)
-const specialTicketType = computed(() => {
-  if (credit.value) {
-    return `◯`
-  }
-})
-
-const useCredit = computed(() => {
-  if (credit.value) {
-    return `赠`
-  }
-})
+const useCredit = computed(() => useCreditLabel.value)
+const querySearch = queryStationSearch
+const handleSelect = (field, item) => handleStationSelect(ticket, field, item)
+const formatStationName = (name) => formatTicketStationName(name)
+const getStationEnglish = (name) => getTicketStationEnglish(name)
 
 const distance = ref(0)
 const saveWithoutDistance = () => {
@@ -500,133 +296,24 @@ const saveWithoutDistance = () => {
   saveTicket()
 }
 
-const disableAirSeats = [
-  '二等座',
-  '一等座',
-  '特等座',
-  '优选一等座',
-  '商务座',
-  '无座',
-  '多功能座',
-  '动卧',
-  '高级动卧',
-  '一等卧',
-  '二等卧',
-  '卧代二等座',
-  '混编硬座',
-  '混编软座',
-  '混编硬卧',
-  '混编软卧',
-  '棚车',
-]
-
-// el-switch 是否禁用
-const airSwitchDisabled = computed(() => {
-  return disableAirSeats.includes(ticket.seatType)
-})
-
-// 最终返回值
-const finalSeatType = computed(() => {
-  if (!ticket.seatType) return ''
-
-  if (value3.value && !airSwitchDisabled.value) {
-    return `新空调${ticket.seatType}`
-  }
-  return ticket.seatType
-})
-
-// 如果切换席位后变成不可用，自动关闭空调
-watch(
-    () => ticket.seatType,
-    () => {
-      if (airSwitchDisabled.value) {
-        value3.value = false
-      }
-    }
-)
-
-// 修改主题选项，id直接对应图片文件名
-const themeOptions = [
-  {
-    id: 'EMU_Red.jpg',
-    label: '经典红',
-    disabled: true,
-  },
-  {
-    id: 'EMU_Blue.jpg',
-    label: '经典蓝',
-    disabled: true,
-  },
-  {
-    id: 'EMU_Green.jpg',
-    label: '动集绿',
-  },
-  {
-    id: 'CIT_Yellow.jpg',
-    label: '动检黄',
-  },
-  {
-    id: 'Harmony_White.jpg',
-    label: '和谐白',
-  },
-  {
-    id: 'Blue_Sister.jpg',
-    label: '蓝妹妹',
-  },
-  {
-    id: 'HXD3D.jpg',
-    label: '番茄红',
-  },
-  {
-    id: 'DF7C.jpg',
-    label: '小橘子',
-  },
-  {
-    id: 'Blank.jpg',
-    label: '空白底',
-  },
-]
-
-function formatStationName(name) {
-  if (!name) return ''
-  const len = name.length
-  if (len === 1) return `　${name}　` // 一个字 → 居中
-  if (len === 2) return name[0] + '　' + name[1] // 两个字 → 中间留空
-  return name // 三个及以上 → 原样显示
-}
-
-// 获取站点英文名
-function getStationEnglish(name) {
-  if (!name) return ''
-  if (name === '香港西九龙') return 'HKWestKowloon'
-  const s = stations.find(s => s.name === name)
-  if (!s) return ''
-  // 首字母大写
-  return s.en.charAt(0).toUpperCase() + s.en.slice(1)
-}
-
-// 定义二维码图片地址
 const qrCodeUrl = ref('')
 
-// 生成二维码函数
 function generateQRCode(text) {
   if (!text) {
     qrCodeUrl.value = ''
     return
   }
-  QRCode.toDataURL(text, { width: 300, margin: 1, color:{ dark: "#000000", light: "#0000"} }, (err, url) => {
+  QRCode.toDataURL(text, { width: 300, margin: 1, color: { dark: '#000000', light: '#0000' } }, (err, url) => {
     if (!err) {
       qrCodeUrl.value = url
     }
   })
 }
 
-// 监听票号变化，自动更新二维码
 watch(() => ticket.number, (newVal) => {
   generateQRCode(newVal)
 })
 
-// 初次加载时生成QR码并显示更新内容
 onMounted(() => {
   generateQRCode(ticket.number)
   if (!sessionStorage.getItem('notified')) {
@@ -640,24 +327,22 @@ const note = () => {
     title: '加入了积分兑换车票的标志！',
     message: '更新内容：加入“使用积分”开关；加入“历史记录”按钮（未启用）。',
     type: 'info',
-    position: "bottom-right"
+    position: 'bottom-right'
   })
 }
 
 const ticketRef = ref(null)
 
-//PDF
 const downloadPDF = async () => {
-  if (!(ticket.number && ticket.date && ticket.from && ticket.to && ticket.price && ticket.seatNo && ticket.seatType && ticket.time && ticket.trainNo)) {
-    ElMessage.warning("请填写所有必填项");
-    return;
+  if (!hasRequiredTicketFields(ticket)) {
+    ElMessage.warning('请填写所有必填项')
+    return
   }
 
   const element = ticketRef.value
   const canvas = await html2canvas(element, { scale: 2, backgroundColor: null })
   const imgData = canvas.toDataURL('image/png')
 
-  // PDF 尺寸：8.6cm x 5.4cm
   const pdf = new jsPDF({
     orientation: 'landscape',
     unit: 'cm',
@@ -668,11 +353,10 @@ const downloadPDF = async () => {
   pdf.save(`${ticket.number}.pdf`)
 }
 
-// 下载 PNG
 const downloadPNG = async () => {
-  if (!(ticket.number && ticket.date && ticket.from && ticket.to && ticket.price && ticket.seatNo && ticket.seatType && ticket.time && ticket.trainNo)) {
-    ElMessage.warning("请填写所有必填项");
-    return;
+  if (!hasRequiredTicketFields(ticket)) {
+    ElMessage.warning('请填写所有必填项')
+    return
   }
 
   const element = ticketRef.value
@@ -685,17 +369,15 @@ const downloadPNG = async () => {
   link.click()
 }
 
-// 历史记录跳转
 const router = useRouter()
 const goToHistory = () => {
   router.push('/history')
 }
 
-// 存储里程
 const saveDistance = ref(false)
 const openSaveDialog = () => {
   if (!userStore.isLogin) {
-    ElMessage.warning("请先登录")
+    ElMessage.warning('请先登录')
     return
   }
   saveDistance.value = true
@@ -703,96 +385,51 @@ const openSaveDialog = () => {
 
 const handleClose = (done) => {
   ElMessageBox.confirm('你确定不要存储这张车票？')
-      .then(() => {
-        done()
-      })
-      .catch(() => {
-        // catch error
-      })
+    .then(() => {
+      done()
+    })
+    .catch(() => {
+      // catch error
+    })
 }
 
 const getCurrentUser = () => {
   if (!userStore.isLogin) return null
-  return JSON.parse(localStorage.getItem("user"))
+  return JSON.parse(localStorage.getItem('user'))
 }
 
 const saveTicket = async () => {
-  // console.log(ticket)
-  // console.log(getCurrentUser())
-  if (!(ticket.number &&
-      ticket.date &&
-      ticket.from &&
-      ticket.to &&
-      ticket.price &&
-      ticket.seatNo &&
-      ticket.seatType &&
-      ticket.time &&
-      ticket.trainNo)) {
-
-    ElMessage.warning("请填写完整车票信息")
+  if (!hasRequiredTicketFields(ticket)) {
+    ElMessage.warning('请填写完整车票信息')
     return
   }
 
-  // 未登录
-  if (!getCurrentUser()) {
-    ElMessage.warning("请先登录")
+  const currentUser = getCurrentUser()
+  if (!currentUser) {
+    ElMessage.warning('请先登录')
     return
   }
 
   try {
-
     const res = await api.post(
-        "http://localhost:3000/api/ticket/add",
-        {
-          user_id: getCurrentUser().id,
-
-          ticket_number: ticket.number,
-          train_no: ticket.trainNo,
-
-          departure_station: ticket.from,
-          arrival_station: ticket.to,
-
-          travel_date: ticket.date,
-          departure_time: ticket.time,
-
-          price: ticket.price,
-
-          use_credit: credit.value ? 1 : 0,
-
-          seat_type: finalSeatType.value,
-
-          has_conditioner: value3.value ? 1 : 0,
-
-          seat_no: ticket.seatNo,
-
-          sell_place: ticket.sellPlace,
-
-          gate_info: ticket.gate,
-
-          message: ticket.message,
-
-          theme: ticket.theme,
-
-          distance: distance.value || 0
-        }
+      'http://localhost:3000/api/ticket/add',
+      buildTicketPayload(ticket, {
+        userId: currentUser.id,
+        useCredit: credit.value,
+        finalSeatType: finalSeatType.value,
+        hasConditioner: value3.value,
+        distance: distance.value,
+      })
     )
 
     if (res.data.success) {
-
-      ElMessage.success("车票保存成功")
-
+      ElMessage.success('车票保存成功')
       saveDistance.value = false
-
     } else {
-
       ElMessage.error(res.data.message)
-
     }
-
   } catch (err) {
-    // console.log(err)
-    ElMessage.error("保存失败")
-
+    ElMessage.error('保存失败')
   }
 }
 </script>
