@@ -213,7 +213,8 @@
             </el-card>
 
             <el-table
-                :data="tableData"
+                v-loading="pageLoading"
+                :data="pagedTableData"
                 :default-sort="{ prop: 'date', order: 'descending' }"
                 class="table"
                 :row-style="tableRowStyle"
@@ -225,9 +226,8 @@
               <el-table-column prop="to" label="终点" width="120" />
               <el-table-column prop="seatType" label="席位" width="120" />
               <el-table-column prop="seatNo" label="座位" width="150" />
-              <el-table-column prop="gate" label="检票/候车" width="120" />
-              <el-table-column prop="number" label="票号/订单号" width="120" />
-              <el-table-column label="操作" width="300">
+              <el-table-column prop="number" label="票号/订单号" width="135" />
+              <el-table-column label="操作" width="200">
                 <template #default="scope">
                   <el-tooltip
                       content="下载车票"
@@ -256,6 +256,17 @@
                 </template>
               </el-table-column>
             </el-table>
+
+            <el-pagination
+                size="large"
+                background
+                layout="prev, pager, next"
+                class="history-pagination"
+                :current-page="currentPage"
+                :page-size="pageSize"
+                :total="tableData.length"
+                @current-change="handlePageChange"
+            />
 
             <div class="history-download-render">
               <div ref="historyTicketRef" class="ticket-container">
@@ -441,6 +452,23 @@ const tableData = computed(() =>
     distance: ticket.distance ?? 0,
   }))
 )
+
+const pageSize = 10
+const currentPage = ref(1)
+const pageLoading = ref(false)
+const pagedTableData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  const end = start + pageSize
+  return tableData.value.slice(start, end)
+})
+
+const handlePageChange = (page) => {
+  pageLoading.value = true
+  currentPage.value = page
+  setTimeout(() => {
+    pageLoading.value = false
+  }, 220)
+}
 
 const tableRowStyle = ({ rowIndex }) => {
   if (rowIndex % 2 === 0) {
@@ -646,6 +674,7 @@ const loadTickets = async () => {
     tickets.value = Array.isArray(res?.data?.data)
       ? res.data.data
       : (Array.isArray(res?.data) ? res.data : [])
+    currentPage.value = 1
 
     trips.value = tickets.value.length
     distance.value = tickets.value.reduce(

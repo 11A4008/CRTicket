@@ -60,9 +60,14 @@
 
 .table {
     width: 100%;
-    height: 100vh;
     margin-top: 30px;
     font-family: "Microsoft YaHei", serif;
     font-size: 16px;
     align-items: center;
+}
+
+.history-pagination {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
 }

@@ -324,8 +324,8 @@ onMounted(() => {
 
 const note = () => {
   ElNotification({
-    title: '加入了积分兑换车票的标志！',
-    message: '更新内容：加入“使用积分”开关；加入“历史记录”按钮（未启用）。',
+    title: '现在可以存储历史车票了！',
+    message: '更新内容：请参阅项目的README与版本更新说明，以了解最新功能。',
     type: 'info',
     position: 'bottom-right'
   })
