@@ -62,4 +62,49 @@ router.post("/login", (req, res) => {
     }
 });
 
+// 用户资料更新接口（用户名和密码二选一或同时修改）
+router.post("/update-profile", (req, res) => {
+    const { id, username, password } = req.body;
+
+    if (!id) {
+        return res.json({ success: false, message: "缺少用户ID" });
+    }
+
+    const user = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+    if (!user) {
+        return res.json({ success: false, message: "用户不存在" });
+    }
+
+    const nextUsername = typeof username === "string" ? username.trim() : "";
+    const nextPassword = typeof password === "string" ? password.trim() : "";
+
+    if (!nextUsername && !nextPassword) {
+        return res.json({ success: false, message: "没有可更新的内容" });
+    }
+
+    if (nextUsername && nextUsername !== user.username) {
+        const existingUser = db.prepare("SELECT * FROM users WHERE username = ?").get(nextUsername);
+        if (existingUser) {
+            return res.json({ success: false, message: "用户名已存在" });
+        }
+    }
+
+    const finalUsername = nextUsername || user.username;
+    const finalPassword = nextPassword ? bcrypt.hashSync(nextPassword, 10) : user.password;
+
+    try {
+        db.prepare("UPDATE users SET username = ?, password = ? WHERE id = ?").run(finalUsername, finalPassword, id);
+        return res.json({
+            success: true,
+            message: "修改成功",
+            user: {
+                id: user.id,
+                username: finalUsername
+            }
+        });
+    } catch (err) {
+        return res.json({ success: false, message: "更新失败，请重试" });
+    }
+});
+
 export default router;

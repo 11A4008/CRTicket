@@ -48,6 +48,7 @@ import { ElMessage } from "element-plus";
 import api from "@/api.js";
 import {useUserStore} from "@/stores/user.js";
 import {User} from "@element-plus/icons-vue";
+import { drawCaptcha, generateCaptcha } from "@/utils/captcha.js";
 
 const router = useRouter();
 const username = ref('');
@@ -67,29 +68,6 @@ const loginValue = computed({
 
 // 获取验证码图片
 const captchaImage = ref(null);
-
-// 刷新验证码
-function generateCaptcha() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return Array.from({ length: 5 }, () =>
-      chars.charAt(Math.floor(Math.random() * chars.length))
-  ).join("");
-}
-
-function drawCaptcha(code) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 100;
-  canvas.height = 40;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#f2f2f2";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.font = "20px Arial";
-  ctx.fillStyle = "#333";
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "center";
-  ctx.fillText(code, canvas.width / 2, canvas.height / 2);
-  return canvas.toDataURL("image/png");
-}
 
 function refreshCaptcha() {
   currentCaptcha = generateCaptcha();

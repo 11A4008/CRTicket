@@ -1,19 +1,192 @@
 <template>
-  <div>
-    <el-container style="height: 100vh">
+  <div class="history-page">
+    <el-container class="history-layout">
       <el-header class="top-header">
         <el-avatar src="Picture1.png" />
         <h2>Sam-Lab CR Ticket Maker</h2>
       </el-header>
       <el-container>
-        <el-aside width="200px" style="background: #f8f9fa; padding: 20px">
+        <el-aside width="220px" class="history-sidebar">
           <el-space direction="vertical" fill style="width: 100%">
             <el-button size="large" @click="goHome()">车票生成</el-button>
             <el-button size="large" type="primary">车票历史</el-button>
+            <el-button v-if="userStore.isLogin" size="large" @click="goUser()">账户管理</el-button>
+            <el-button v-else size="large" @click="goLogin()">账户管理</el-button>
           </el-space>
 
         </el-aside>
         <el-main>
+          <el-dialog v-model="dialogFormVisible1" :title="isEditMode ? '编辑记录' : '补登记录'" width="50%">
+            <el-form
+                :model="ticket"
+                :rules="rules"
+                ref="formRef"
+                label-width="100px"
+                label-position="left"
+            >
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="票号">
+                    <el-input v-model="ticket.number" placeholder="例如：E351822734"></el-input>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="车次" prop="trainNo">
+                    <el-input v-model="ticket.trainNo" placeholder="例如：G25 或 1461" />
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="起点">
+                    <el-autocomplete
+                        v-model="ticket.from"
+                        :fetch-suggestions="querySearch"
+                        placeholder="输入站名或拼音"
+                        clearable
+                        @select="handleSelect('from', $event)"
+                    />
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="终点">
+                    <el-autocomplete
+                        v-model="ticket.to"
+                        :fetch-suggestions="querySearch"
+                        placeholder="输入站名或拼音"
+                        clearable
+                        @select="handleSelect('to', $event)"
+                    />
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="开车日期">
+                    <el-date-picker
+                        v-model="ticket.date"
+                        type="date"
+                        placeholder="请选择乘车日期"
+                        format="YYYY/MM/DD"
+                        value-format="YYYY年MM月DD日"
+                    />
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="开车时间">
+                    <el-time-picker
+                        v-model="ticket.time"
+                        placeholder="选择开车时间"
+                        format="HH:mm"
+                        value-format="HH:mm"
+                    />
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="票价">
+                    <el-input-number v-model="ticket.price" placeholder="请输入数字" :min="0" :step="0.5"></el-input-number>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="6">
+                  <el-form-item label="使用积分">
+                    <el-switch
+                        v-model="credit"
+                        inline-prompt
+                        :active-icon="Check"
+                        :inactive-icon="Close"
+                    />
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="6">
+                  <el-form-item label="空调选择">
+                    <el-switch
+                        v-model="value3"
+                        :disabled="airSwitchDisabled"
+                        inline-prompt
+                        :active-icon="Check"
+                        :inactive-icon="Close"
+                    />
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="席位名称">
+                    <el-select v-model="ticket.seatType" placeholder="Select">
+                      <el-option
+                          v-for="item in options"
+                          :key="item.value"
+                          :label="item.label"
+                          :value="item.value"
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="座位号">
+                    <el-input v-model="ticket.seatNo" placeholder="03车12A号"></el-input>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="售票地点">
+                    <el-input v-model="ticket.sellPlace" placeholder="XX站"></el-input>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="检票/候车位置">
+                    <el-input v-model="ticket.gate" placeholder="检票：1A / 候车：一候"></el-input>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="选择背景">
+                    <el-select v-model="ticket.theme" placeholder="请选择主题" style="width: 240px">
+                      <el-option
+                          v-for="item in themeOptions"
+                          :key="item.id"
+                          :label="item.label"
+                          :value="item.id"
+                          :disabled="item.disabled"
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="12">
+                  <el-form-item label="里程">
+                    <el-input-number v-model="ticket.distance" placeholder="请输入数字" :min="0"></el-input-number>
+                  </el-form-item>
+                </el-col>
+
+                <!-- 提示语单独占一行 -->
+                <el-col :span="24">
+                  <el-form-item label="提示语">
+                    <el-input
+                        v-model="ticket.message"
+                        :rows="3"
+                        type="textarea"
+                        placeholder="输入提示语"
+                    />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+            </el-form>
+
+            <template #footer>
+              <div class="dialog-footer">
+                <el-button @click="dialogFormVisible1 = false">Cancel</el-button>
+                <el-button type="primary" @click="saveTicket()">
+                  Confirm
+                </el-button>
+              </div>
+            </template>
+          </el-dialog>
           <div v-if="userStore.isLogin">
             <el-backtop :right="20" :bottom="20" />
             <el-card class="user-card">
@@ -24,178 +197,6 @@
                 <el-button type="success" size="large" class="supplement-bottom-right" @click="openCreateDialog()">
                   <el-icon><DocumentAdd /></el-icon>补登记录
                 </el-button>
-
-                <el-dialog v-model="dialogFormVisible1" :title="isEditMode ? '编辑记录' : '补登记录'" width="50%">
-                  <el-form
-                      :model="ticket"
-                      :rules="rules"
-                      ref="formRef"
-                      label-width="100px"
-                      label-position="left"
-                  >
-                    <el-row :gutter="20">
-                      <el-col :span="12">
-                        <el-form-item label="票号">
-                          <el-input v-model="ticket.number" placeholder="例如：E351822734"></el-input>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="车次" prop="trainNo">
-                          <el-input v-model="ticket.trainNo" placeholder="例如：G25 或 1461" />
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="起点">
-                          <el-autocomplete
-                              v-model="ticket.from"
-                              :fetch-suggestions="querySearch"
-                              placeholder="输入站名或拼音"
-                              clearable
-                              @select="handleSelect('from', $event)"
-                          />
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="终点">
-                          <el-autocomplete
-                              v-model="ticket.to"
-                              :fetch-suggestions="querySearch"
-                              placeholder="输入站名或拼音"
-                              clearable
-                              @select="handleSelect('to', $event)"
-                          />
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="开车日期">
-                          <el-date-picker
-                              v-model="ticket.date"
-                              type="date"
-                              placeholder="请选择乘车日期"
-                              format="YYYY/MM/DD"
-                              value-format="YYYY年MM月DD日"
-                          />
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="开车时间">
-                          <el-time-picker
-                              v-model="ticket.time"
-                              placeholder="选择开车时间"
-                              format="HH:mm"
-                              value-format="HH:mm"
-                          />
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="票价">
-                          <el-input-number v-model="ticket.price" placeholder="请输入数字" :min="0" :step="0.5"></el-input-number>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="6">
-                        <el-form-item label="使用积分">
-                          <el-switch
-                              v-model="credit"
-                              inline-prompt
-                              :active-icon="Check"
-                              :inactive-icon="Close"
-                          />
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="6">
-                        <el-form-item label="空调选择">
-                          <el-switch
-                              v-model="value3"
-                              :disabled="airSwitchDisabled"
-                              inline-prompt
-                              :active-icon="Check"
-                              :inactive-icon="Close"
-                          />
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="席位名称">
-                          <el-select v-model="ticket.seatType" placeholder="Select">
-                            <el-option
-                                v-for="item in options"
-                                :key="item.value"
-                                :label="item.label"
-                                :value="item.value"
-                            />
-                          </el-select>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="座位号">
-                          <el-input v-model="ticket.seatNo" placeholder="03车12A号"></el-input>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="售票地点">
-                          <el-input v-model="ticket.sellPlace" placeholder="XX站"></el-input>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="检票/候车位置">
-                          <el-input v-model="ticket.gate" placeholder="检票：1A / 候车：一候"></el-input>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="选择背景">
-                          <el-select v-model="ticket.theme" placeholder="请选择主题" style="width: 240px">
-                            <el-option
-                                v-for="item in themeOptions"
-                                :key="item.id"
-                                :label="item.label"
-                                :value="item.id"
-                                :disabled="item.disabled"
-                            />
-                          </el-select>
-                        </el-form-item>
-                      </el-col>
-
-                      <el-col :span="12">
-                        <el-form-item label="里程">
-                          <el-input-number v-model="ticket.distance" placeholder="请输入数字" :min="0"></el-input-number>
-                        </el-form-item>
-                      </el-col>
-
-                      <!-- 提示语单独占一行 -->
-                      <el-col :span="24">
-                        <el-form-item label="提示语">
-                          <el-input
-                              v-model="ticket.message"
-                              :rows="3"
-                              type="textarea"
-                              placeholder="输入提示语"
-                          />
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </el-form>
-
-                  <template #footer>
-                    <div class="dialog-footer">
-                      <el-button @click="dialogFormVisible1 = false">Cancel</el-button>
-                      <el-button type="primary" @click="saveTicket()">
-                        Confirm
-                      </el-button>
-                    </div>
-                  </template>
-                </el-dialog>
 
                 <el-avatar :size="120" src="Picture1.png" />
 
@@ -212,50 +213,52 @@
               </div>
             </el-card>
 
-            <el-table
-                v-loading="pageLoading"
-                :data="pagedTableData"
-                :default-sort="{ prop: 'date', order: 'descending' }"
-                class="table"
-                :row-style="tableRowStyle"
-            >
-              <el-table-column prop="date" label="日期" width="160" sortable/>
-              <el-table-column prop="trainNo" label="车次" width="80" />
-              <el-table-column prop="price" label="票价" width="80" sortable/>
-              <el-table-column prop="from" label="起点" width="120" />
-              <el-table-column prop="to" label="终点" width="120" />
-              <el-table-column prop="seatType" label="席位" width="120" />
-              <el-table-column prop="seatNo" label="座位" width="150" />
-              <el-table-column prop="number" label="票号/订单号" width="135" />
-              <el-table-column label="操作" width="200">
-                <template #default="scope">
-                  <el-tooltip
-                      content="下载车票"
-                      placement="bottom"
-                  >
-                    <el-button type="success" @click="downloadHistoryPNG(scope.row)">
-                      <el-icon><Download /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip
-                      content="编辑记录"
-                      placement="bottom"
-                  >
-                    <el-button @click="openEditDialog(scope.row)">
-                      <el-icon><Edit /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip
-                      content="删除记录"
-                      placement="bottom"
-                  >
-                    <el-button type="danger" @click="deleteHistory(scope.row)">
-                      <el-icon><Delete /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                </template>
-              </el-table-column>
-            </el-table>
+            <div class="table-shell">
+              <el-table
+                  v-loading="pageLoading"
+                  :data="pagedTableData"
+                  :default-sort="{ prop: 'date', order: 'descending' }"
+                  class="table"
+                  :row-style="tableRowStyle"
+              >
+                <el-table-column prop="date" label="日期" width="160" sortable/>
+                <el-table-column prop="trainNo" label="车次" width="80" />
+                <el-table-column prop="price" label="票价" width="80" sortable/>
+                <el-table-column prop="from" label="起点" width="120" />
+                <el-table-column prop="to" label="终点" width="120" />
+                <el-table-column prop="seatType" label="席位" width="120" />
+                <el-table-column prop="seatNo" label="座位" width="150" />
+                <el-table-column prop="number" label="票号/订单号" width="135" />
+                <el-table-column label="操作" width="200">
+                  <template #default="scope">
+                    <el-tooltip
+                        content="下载车票"
+                        placement="bottom"
+                    >
+                      <el-button type="success" @click="downloadHistoryPNG(scope.row)">
+                        <el-icon><Download /></el-icon>
+                      </el-button>
+                    </el-tooltip>
+                    <el-tooltip
+                        content="编辑记录"
+                        placement="bottom"
+                    >
+                      <el-button @click="openEditDialog(scope.row)">
+                        <el-icon><Edit /></el-icon>
+                      </el-button>
+                    </el-tooltip>
+                    <el-tooltip
+                        content="删除记录"
+                        placement="bottom"
+                    >
+                      <el-button type="danger" @click="deleteHistory(scope.row)">
+                        <el-icon><Delete /></el-icon>
+                      </el-button>
+                    </el-tooltip>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
 
             <el-pagination
                 size="large"
@@ -367,6 +370,10 @@ const goLogin = () => {
   router.push('/login')
 }
 
+const goUser = () => {
+  router.push('/user')
+}
+
 const userStore = useUserStore()
 
 const getCurrentUser = () => {
@@ -472,9 +479,9 @@ const handlePageChange = (page) => {
 
 const tableRowStyle = ({ rowIndex }) => {
   if (rowIndex % 2 === 0) {
-    return { backgroundColor: 'rgb(217, 236, 255)' }
+    return { backgroundColor: 'rgba(226, 239, 255, 0.68)' }
   }
-  return {}
+  return { backgroundColor: 'rgba(255, 255, 255, 0.78)' }
 }
 
 const resetTicketForm = () => {
@@ -711,5 +718,35 @@ html, body {
   left: -9999px;
   top: 0;
   pointer-events: none;
+}
+
+.history-page {
+  min-height: 100vh;
+  background:
+      radial-gradient(circle at 8% 10%, rgba(255, 186, 73, 0.22), transparent 40%),
+      radial-gradient(circle at 92% 92%, rgba(61, 162, 255, 0.2), transparent 42%),
+      linear-gradient(160deg, #f6f8fb 0%, #eef3ff 100%);
+}
+
+.history-layout {
+  min-height: 100vh;
+}
+
+.table-shell :deep(.el-table) {
+  --el-table-header-bg-color: rgba(227, 236, 251, 0.9);
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(176, 214, 255, 0.35);
+  --el-table-border-color: rgba(131, 152, 176, 0.28);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table-shell :deep(.el-table th.el-table__cell) {
+  color: #1f3e5a;
+  font-weight: 700;
+}
+
+.table-shell :deep(.el-table td.el-table__cell) {
+  border-bottom: 1px solid rgba(131, 152, 176, 0.2);
 }
 </style>

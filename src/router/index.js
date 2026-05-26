@@ -4,6 +4,8 @@ import HistoryView from '../views/HistoryView.vue'
 import Login from "@/views/Login.vue";
 import Register from "@/views/Register.vue";
 import Debug from "@/views/Debug.vue";
+import User from "@/views/User.vue";
+
 
 const routes = [
     {
@@ -25,6 +27,10 @@ const routes = [
     {
         path: '/debug',
         component: Debug
+    },
+    {
+        path: '/user',
+        component: User
     }
 ]
 
