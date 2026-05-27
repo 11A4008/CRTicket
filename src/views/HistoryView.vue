@@ -218,6 +218,7 @@
                   v-loading="pageLoading"
                   :data="pagedTableData"
                   :default-sort="{ prop: 'date', order: 'descending' }"
+                  @sort-change="handleSortChange"
                   class="table"
                   :row-style="tableRowStyle"
               >
@@ -463,10 +464,40 @@ const tableData = computed(() =>
 const pageSize = 10
 const currentPage = ref(1)
 const pageLoading = ref(false)
+const sortState = ref({
+  prop: 'date',
+  order: 'descending',
+})
+const sortedTableData = computed(() => {
+  const { prop, order } = sortState.value
+  if (!prop || !order) {
+    return tableData.value
+  }
+
+  const direction = order === 'ascending' ? 1 : -1
+  return [...tableData.value].sort((a, b) => {
+    if (prop === 'date') {
+      const aTime = a.date ? new Date(String(a.date).replace(/年|月/g, '/').replace(/日/g, '')).getTime() : 0
+      const bTime = b.date ? new Date(String(b.date).replace(/年|月/g, '/').replace(/日/g, '')).getTime() : 0
+      return (aTime - bTime) * direction
+    }
+
+    if (prop === 'price') {
+      const aPrice = Number(a.price) || 0
+      const bPrice = Number(b.price) || 0
+      return (aPrice - bPrice) * direction
+    }
+
+    const aVal = a[prop]
+    const bVal = b[prop]
+    if (aVal === bVal) return 0
+    return (String(aVal).localeCompare(String(bVal))) * direction
+  })
+})
 const pagedTableData = computed(() => {
   const start = (currentPage.value - 1) * pageSize
   const end = start + pageSize
-  return tableData.value.slice(start, end)
+  return sortedTableData.value.slice(start, end)
 })
 
 const handlePageChange = (page) => {
@@ -475,6 +506,11 @@ const handlePageChange = (page) => {
   setTimeout(() => {
     pageLoading.value = false
   }, 220)
+}
+
+const handleSortChange = ({ prop, order }) => {
+  sortState.value = { prop, order }
+  currentPage.value = 1
 }
 
 const tableRowStyle = ({ rowIndex }) => {
