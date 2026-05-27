@@ -4,7 +4,7 @@
   </el-button>
   <el-container style="height: 100vh">
     <el-aside width="350px" style="background: #f8f9fa; padding: 20px;">
-      <h2 style="margin-bottom: 20px; font-family: Roboto,serif">Sam-Lab CR Ticket Maker</h2>
+      <h2 style="margin-bottom: 20px; font-family: 'Roboto', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">Sam-Lab CR Ticket Maker</h2>
       <el-form
           :model="ticket"
           :rules="rules"
@@ -137,8 +137,8 @@
         </el-form-item>
 
       </el-form>
-      <h3 style="font-family: Consolas,serif">Version 260525</h3>
-      <h3 style="font-family: Consolas,serif">Station Version 10109</h3>
+      <h3 style="font-family: Consolas, 'Courier New', monospace">Version 260525</h3>
+      <h3 style="font-family: Consolas, 'Courier New', monospace">Station Version 10109</h3>
 
       <el-button type="primary" @click="note">更新内容</el-button>
 

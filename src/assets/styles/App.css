@@ -37,19 +37,6 @@
 }
 
 /* 文字区域 */
-@font-face {
-    font-family: "FZCDXK";
-    src: url("/FZCDXK.TTF") format("truetype");
-    font-weight: normal;
-    font-style: normal;
-}
-
-@font-face {
-    font-family: "OCRB";
-    src: url("/OCRB.ttf") format("truetype");
-    font-weight: normal;
-    font-style: normal;
-}
 
 .ticket-number {
     position: absolute;
