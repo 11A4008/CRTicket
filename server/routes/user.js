@@ -199,6 +199,38 @@ router.get("/statistics", (req, res) => {
     }
 });
 
+// 获取用户车票历史记录（用于轨迹地图）
+router.get("/ticket-history", (req, res) => {
+    const { userId } = req.query;
+
+    if (!userId) {
+        return res.json({ success: false, message: "缺少用户ID" });
+    }
+
+    try {
+        const tickets = db.prepare(`
+            SELECT
+                id,
+                departure_station as departureStation,
+                arrival_station as arrivalStation,
+                travel_date as travelDate,
+                train_no as trainNumber
+            FROM tickets
+            WHERE user_id = ?
+            ORDER BY travel_date DESC
+            LIMIT 500
+        `).all(userId);
+
+        return res.json({
+            success: true,
+            data: tickets
+        });
+    } catch (err) {
+        console.error(err);
+        return res.json({ success: false, message: "获取历史记录失败" });
+    }
+});
+
 // 获取月度运转日期数据（日历热力图用）
 router.get("/monthly-tickets", (req, res) => {
     const { userId, year, month } = req.query;

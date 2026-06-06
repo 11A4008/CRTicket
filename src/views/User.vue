@@ -126,6 +126,17 @@
               </el-col>
             </el-row>
             <el-empty v-if="!statisticsLoading && statisticsData.departures.length === 0 && statisticsData.arrivals.length === 0" description="暂无运转数据"></el-empty>
+
+            <!-- 运转轨迹地图 -->
+            <div class="map-section">
+              <h4>历史运转轨迹</h4>
+              <el-row :gutter="20">
+                <el-col :span="24">
+                  <div ref="mapChartRef" class="map-container" v-loading="mapLoading"></div>
+                </el-col>
+              </el-row>
+              <el-empty v-if="!mapLoading && ticketHistory.length === 0" description="暂无轨迹数据"></el-empty>
+            </div>
           </el-card>
         </el-main>
       </el-container>
@@ -142,6 +153,7 @@ import * as echarts from "echarts";
 import api from "@/api.js";
 import { drawCaptcha, generateCaptcha } from "@/utils/captcha.js";
 import stationNamesData from "@/station_name.js";
+import stationCoordinates, { loadChinaMap } from "@/utils/stationCoordinates.js";
 
 const router = useRouter()
 const goHome = () => {
@@ -175,8 +187,11 @@ const stations = parseStations()
 const statisticsChartRef = ref(null)
 const cityChartRef = ref(null)
 const calendarChartRef = ref(null)
+const mapChartRef = ref(null)
 const statisticsLoading = ref(false)
+const mapLoading = ref(false)
 const statisticsData = ref({ departures: [], arrivals: [] })
+const ticketHistory = ref([])
 const selectedMonth = ref('')
 const monthlyData = ref([])
 
@@ -242,6 +257,198 @@ async function loadMonthlyData() {
   } catch (err) {
     console.error(err);
   }
+}
+
+async function loadTicketHistory() {
+  const userRaw = localStorage.getItem("user");
+  if (!userRaw) return;
+
+  let user;
+  try {
+    user = JSON.parse(userRaw);
+  } catch {
+    return;
+  }
+
+  try {
+    mapLoading.value = true;
+    const response = await api.get(`/user/ticket-history?userId=${user.id}`);
+    if (response.data.success) {
+      ticketHistory.value = response.data.data;
+      await nextTick();
+      renderMapChart();
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    mapLoading.value = false;
+  }
+}
+
+function renderMapChart() {
+  if (!mapChartRef.value || ticketHistory.value.length === 0) return;
+
+  const chart = echarts.init(mapChartRef.value);
+
+  // 收集所有有坐标的车站
+  const points = [];
+  const lines = [];
+
+  ticketHistory.value.forEach(ticket => {
+    const departureCoords = stationCoordinates[ticket.departureStation];
+    const arrivalCoords = stationCoordinates[ticket.arrivalStation];
+
+    if (departureCoords) {
+      points.push({
+        name: getStationName(ticket.departureStation),
+        value: departureCoords,
+        count: (points.find(p => p.value[0] === departureCoords[0] && p.value[1] === departureCoords[1])?.count || 0) + 1
+      });
+    }
+
+    if (arrivalCoords) {
+      points.push({
+        name: getStationName(ticket.arrivalStation),
+        value: arrivalCoords,
+        count: (points.find(p => p.value[0] === arrivalCoords[0] && p.value[1] === arrivalCoords[1])?.count || 0) + 1
+      });
+    }
+
+    // 如果出发和到达都有坐标，添加轨迹线
+    if (departureCoords && arrivalCoords) {
+      lines.push({
+        coords: [departureCoords, arrivalCoords]
+      });
+    }
+  });
+
+  // 去重站点
+  const uniquePoints = [];
+  const pointMap = new Map();
+  points.forEach(p => {
+    const key = `${p.value[0]},${p.value[1]}`;
+    if (!pointMap.has(key)) {
+      pointMap.set(key, p.count);
+      uniquePoints.push({
+        name: p.name,
+        value: p.value,
+        count: p.count
+      });
+    } else {
+      const existing = uniquePoints.find(up => up.value[0] === p.value[0] && up.value[1] === p.value[1]);
+      if (existing) {
+        existing.count += p.count;
+      }
+    }
+  });
+
+  const maxCount = Math.max(...uniquePoints.map(p => p.count), 1);
+
+  // 先加载地图数据
+  loadChinaMap(echarts).then(mapLoaded => {
+    if (!mapLoaded) {
+      ElMessage.warning('地图数据加载失败，请刷新页面重试');
+      return;
+    }
+
+    const option = {
+      title: {
+        text: '中老铁路运转轨迹',
+        left: 'center',
+        textStyle: { fontSize: 16, fontWeight: 'normal', color: '#17324d' }
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: (params) => {
+          if (params.componentType === 'series' && params.seriesType === 'effectScatter') {
+            return `${params.data.name}<br/>运转次数: ${params.data.count} 次`;
+          }
+          return '';
+        }
+      },
+      geo: {
+        map: 'china',
+        roam: true,
+        zoom: 1.2,
+        center: [105, 36],
+        label: {
+          show: false
+        },
+        itemStyle: {
+          areaColor: '#e8f5e9',
+          borderColor: '#81c784',
+          borderWidth: 1
+        },
+        emphasis: {
+          itemStyle: {
+            areaColor: '#c8e6c9'
+          },
+          label: {
+            show: true,
+            color: '#333'
+          }
+        },
+        select: {
+          disabled: true
+        }
+      },
+      series: [
+        {
+          name: '运转轨迹',
+          type: 'lines',
+          coordinateSystem: 'geo',
+          zlevel: 2,
+          symbol: ['none', 'none'],
+          effect: {
+            show: true,
+            period: 4,
+            trailLength: 0.4,
+            color: '#ff9800',
+            symbol: 'circle',
+            symbolSize: 4
+          },
+          lineStyle: {
+            color: '#ff9800',
+            width: 2,
+            opacity: 0.6,
+            curveness: 0.2
+          },
+          data: lines
+        },
+        {
+          name: '站点',
+          type: 'effectScatter',
+          coordinateSystem: 'geo',
+          zlevel: 3,
+          rippleEffect: {
+            brushType: 'stroke',
+            scale: 3
+          },
+          label: {
+            show: true,
+            position: 'right',
+            formatter: '{b}',
+            fontSize: 10,
+            color: '#17324d'
+          },
+          symbolSize: (val, params) => {
+            const count = params.data.count;
+            return Math.max(8, Math.min(20, 8 + count * 2));
+          },
+          itemStyle: {
+            color: '#e53935'
+          },
+          data: uniquePoints.map(p => ({
+            name: p.name,
+            value: p.value,
+            count: p.count
+          }))
+        }
+      ]
+    };
+
+    chart.setOption(option);
+  });
 }
 
 function renderCalendarChart() {
@@ -598,6 +805,7 @@ onMounted(() => {
   selectedMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   loadStatistics();
   loadMonthlyData();
+  loadTicketHistory();
 })
 
 async function handleDeleteAccount() {
@@ -809,6 +1017,25 @@ async function handleDeleteAccount() {
 .calendar-container {
   width: 100%;
   height: 260px;
+}
+
+.map-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed #e0e0e0;
+}
+
+.map-section h4 {
+  margin: 0 0 16px;
+  color: #17324d;
+  font-size: 16px;
+}
+
+.map-container {
+  width: 100%;
+  height: 500px;
+  border-radius: 12px;
+  background: #fff;
 }
 
 @media (max-width: 900px) {
