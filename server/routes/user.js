@@ -167,14 +167,13 @@ router.get("/statistics", (req, res) => {
     }
 
     try {
-        // 获取用户的出发和到达站点统计
+        // 获取用户的出发和到达站点统计（返回全部数据，前端排序取 TOP 10）
         const departureStats = db.prepare(`
             SELECT departure_station as station, COUNT(*) as count
             FROM tickets
             WHERE user_id = ? AND departure_station IS NOT NULL AND departure_station != ''
             GROUP BY departure_station
             ORDER BY count DESC
-            LIMIT 10
         `).all(userId);
 
         const arrivalStats = db.prepare(`
@@ -183,7 +182,6 @@ router.get("/statistics", (req, res) => {
             WHERE user_id = ? AND arrival_station IS NOT NULL AND arrival_station != ''
             GROUP BY arrival_station
             ORDER BY count DESC
-            LIMIT 10
         `).all(userId);
 
         return res.json({

@@ -183,6 +183,14 @@ const parseStations = () => {
 
 const stations = parseStations()
 
+// 构建站点名称到城市名的映射
+const stationNameToCityMap = new Map();
+stations.forEach(s => {
+  if (s.name && s.city) {
+    stationNameToCityMap.set(s.name, s.city);
+  }
+});
+
 // 统计图表相关
 const statisticsChartRef = ref(null)
 const cityChartRef = ref(null)
@@ -200,9 +208,8 @@ const getStationName = (code) => {
   return station ? station.name : code
 }
 
-const getCityName = (code) => {
-  const station = stations.find(s => s.code === code)
-  return station ? station.city : ''
+const getCityName = (stationName) => {
+  return stationNameToCityMap.get(stationName) || ''
 }
 
 async function loadStatistics() {
@@ -285,33 +292,48 @@ async function loadTicketHistory() {
   }
 }
 
+// 通过站点全名获取坐标（直接映射）
+const getStationCoords = (stationName) => {
+  return stationCoordinates[stationName] || null;
+};
+
 function renderMapChart() {
   if (!mapChartRef.value || ticketHistory.value.length === 0) return;
 
   const chart = echarts.init(mapChartRef.value);
 
-  // 收集所有有坐标的车站
-  const points = [];
+  // 收集所有有坐标的车站（用 Map 正确计数）
+  const stationMap = new Map(); // key: "经度,纬度", value: { name, value, count }
   const lines = [];
 
   ticketHistory.value.forEach(ticket => {
-    const departureCoords = stationCoordinates[ticket.departureStation];
-    const arrivalCoords = stationCoordinates[ticket.arrivalStation];
+    const departureCoords = getStationCoords(ticket.departureStation);
+    const arrivalCoords = getStationCoords(ticket.arrivalStation);
 
     if (departureCoords) {
-      points.push({
-        name: getStationName(ticket.departureStation),
-        value: departureCoords,
-        count: (points.find(p => p.value[0] === departureCoords[0] && p.value[1] === departureCoords[1])?.count || 0) + 1
-      });
+      const key = `${departureCoords[0]},${departureCoords[1]}`;
+      if (stationMap.has(key)) {
+        stationMap.get(key).count += 1;
+      } else {
+        stationMap.set(key, {
+          name: ticket.departureStation,
+          value: departureCoords,
+          count: 1
+        });
+      }
     }
 
     if (arrivalCoords) {
-      points.push({
-        name: getStationName(ticket.arrivalStation),
-        value: arrivalCoords,
-        count: (points.find(p => p.value[0] === arrivalCoords[0] && p.value[1] === arrivalCoords[1])?.count || 0) + 1
-      });
+      const key = `${arrivalCoords[0]},${arrivalCoords[1]}`;
+      if (stationMap.has(key)) {
+        stationMap.get(key).count += 1;
+      } else {
+        stationMap.set(key, {
+          name: ticket.arrivalStation,
+          value: arrivalCoords,
+          count: 1
+        });
+      }
     }
 
     // 如果出发和到达都有坐标，添加轨迹线
@@ -322,25 +344,7 @@ function renderMapChart() {
     }
   });
 
-  // 去重站点
-  const uniquePoints = [];
-  const pointMap = new Map();
-  points.forEach(p => {
-    const key = `${p.value[0]},${p.value[1]}`;
-    if (!pointMap.has(key)) {
-      pointMap.set(key, p.count);
-      uniquePoints.push({
-        name: p.name,
-        value: p.value,
-        count: p.count
-      });
-    } else {
-      const existing = uniquePoints.find(up => up.value[0] === p.value[0] && up.value[1] === p.value[1]);
-      if (existing) {
-        existing.count += p.count;
-      }
-    }
-  });
+  const uniquePoints = [...stationMap.values()];
 
   const maxCount = Math.max(...uniquePoints.map(p => p.count), 1);
 
@@ -554,12 +558,12 @@ function renderStationChart() {
 
   const chart = echarts.init(statisticsChartRef.value);
 
-  // 合并出发和到达站点统计
+  // 合并出发和到达站点统计（数据已经是站点全名）
   const stationCountMap = new Map();
 
   statisticsData.value.departures.forEach(item => {
-    const name = getStationName(item.station);
-    stationCountMap.set(item.station, {
+    const name = item.station;  // 直接使用站点全名
+    stationCountMap.set(name, {
       name,
       departure: item.count,
       arrival: 0
@@ -567,11 +571,11 @@ function renderStationChart() {
   });
 
   statisticsData.value.arrivals.forEach(item => {
-    const name = getStationName(item.station);
-    if (stationCountMap.has(item.station)) {
-      stationCountMap.get(item.station).arrival = item.count;
+    const name = item.station;
+    if (stationCountMap.has(name)) {
+      stationCountMap.get(name).arrival = item.count;
     } else {
-      stationCountMap.set(item.station, {
+      stationCountMap.set(name, {
         name,
         departure: 0,
         arrival: item.count
@@ -637,11 +641,11 @@ function renderCityChart() {
 
   const chart = echarts.init(cityChartRef.value);
 
-  // 统计城市访问次数（出发+到达）
+  // 统计城市访问次数（出发+到达），数据已是站点全名
   const cityCountMap = new Map();
 
   statisticsData.value.departures.forEach(item => {
-    const city = getCityName(item.station);
+    const city = getCityName(item.station);  // 通过站点全名获取城市名
     if (city) {
       cityCountMap.set(city, (cityCountMap.get(city) || 0) + item.count);
     }
