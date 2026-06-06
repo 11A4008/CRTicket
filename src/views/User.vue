@@ -95,9 +95,37 @@
             </template>
           </el-dialog>
 
-          <el-card class="coming-soon-card" shadow="never">
+          <el-card class="statistics-card" shadow="never">
             <h3>个人运转数据</h3>
-            <p>开发中</p>
+            <el-row :gutter="20" v-loading="statisticsLoading">
+              <el-col :span="24">
+                <div ref="statisticsChartRef" class="chart-container"></div>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :xs="24" :sm="24" :md="12">
+                <div ref="cityChartRef" class="chart-container"></div>
+              </el-col>
+              <el-col :xs="24" :sm="24" :md="12">
+                <div class="calendar-wrapper">
+                  <div class="calendar-header">
+                    <span>月度运转日历</span>
+                    <el-date-picker
+                      v-model="selectedMonth"
+                      type="month"
+                      placeholder="选择月份"
+                      format="YYYY-MM"
+                      value-format="YYYY-MM"
+                      :clearable="false"
+                      size="small"
+                      @change="loadMonthlyData"
+                    />
+                  </div>
+                  <div ref="calendarChartRef" class="calendar-container"></div>
+                </div>
+              </el-col>
+            </el-row>
+            <el-empty v-if="!statisticsLoading && statisticsData.departures.length === 0 && statisticsData.arrivals.length === 0" description="暂无运转数据"></el-empty>
           </el-card>
         </el-main>
       </el-container>
@@ -106,12 +134,14 @@
 </template>
 
 <script setup>
-import {useRouter} from "vue-router";
-import {onMounted, ref, nextTick} from "vue";
+import { useRouter } from "vue-router";
+import { onMounted, ref, nextTick, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Delete } from "@element-plus/icons-vue";
+import * as echarts from "echarts";
 import api from "@/api.js";
 import { drawCaptcha, generateCaptcha } from "@/utils/captcha.js";
+import stationNamesData from "@/station_name.js";
 
 const router = useRouter()
 const goHome = () => {
@@ -119,6 +149,339 @@ const goHome = () => {
 }
 const goHistory = () => {
   router.push('/history')
+}
+
+// 解析站点数据
+const parseStations = () => {
+  return stationNamesData
+    .split('@')
+    .filter(Boolean)
+    .map((item) => {
+      const arr = item.split('|')
+      return {
+        code: arr[0],
+        name: arr[1],
+        telecode: arr[2],
+        en: arr[3],
+        abbr: arr[4],
+        city: arr[7],
+      }
+    })
+}
+
+const stations = parseStations()
+
+// 统计图表相关
+const statisticsChartRef = ref(null)
+const cityChartRef = ref(null)
+const calendarChartRef = ref(null)
+const statisticsLoading = ref(false)
+const statisticsData = ref({ departures: [], arrivals: [] })
+const selectedMonth = ref('')
+const monthlyData = ref([])
+
+const getStationName = (code) => {
+  const station = stations.find(s => s.code === code)
+  return station ? station.name : code
+}
+
+const getCityName = (code) => {
+  const station = stations.find(s => s.code === code)
+  return station ? station.city : ''
+}
+
+async function loadStatistics() {
+  const userRaw = localStorage.getItem("user");
+  if (!userRaw) return;
+
+  let user;
+  try {
+    user = JSON.parse(userRaw);
+  } catch {
+    return;
+  }
+
+  try {
+    statisticsLoading.value = true;
+    const response = await api.get(`/user/statistics?userId=${user.id}`);
+    if (response.data.success) {
+      statisticsData.value = response.data.data;
+      await nextTick();
+      renderStationChart();
+      renderCityChart();
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    statisticsLoading.value = false;
+  }
+}
+
+async function loadMonthlyData() {
+  if (!selectedMonth.value) return;
+
+  const userRaw = localStorage.getItem("user");
+  if (!userRaw) return;
+
+  let user;
+  try {
+    user = JSON.parse(userRaw);
+  } catch {
+    return;
+  }
+
+  const [year, month] = selectedMonth.value.split('-');
+
+  try {
+    const response = await api.get(`/user/monthly-tickets?userId=${user.id}&year=${year}&month=${month}`);
+    if (response.data.success) {
+      monthlyData.value = response.data.data.tickets;
+      await nextTick();
+      renderCalendarChart();
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderCalendarChart() {
+  if (!calendarChartRef.value || !selectedMonth.value) return;
+
+  const container = calendarChartRef.value;
+  const chart = echarts.init(container);
+
+  const [year, month] = selectedMonth.value.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  // 构建日期数据 map，方便快速查找
+  const dataMap = new Map();
+  monthlyData.value.forEach(item => {
+    dataMap.set(item.travel_date, item.count);
+  });
+
+  // 补充完整一个月的所有日期（无数据的日期 count 为 0，但仍然显示）
+  const calendarData = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    calendarData.push([dateStr, dataMap.get(dateStr) || 0]);
+  }
+
+  const maxCount = monthlyData.value.length > 0
+    ? Math.max(...monthlyData.value.map(t => t.count))
+    : 3;
+
+  const option = {
+    tooltip: {
+      formatter: (params) => {
+        if (params.data[1] === 0) {
+          return `${params.data[0]}<br/>无运转记录`;
+        }
+        return `${params.data[0]}<br/>运转次数: ${params.data[1]} 次`;
+      }
+    },
+    visualMap: {
+      min: 0,
+      max: maxCount,
+      calculable: false,
+      show: false,
+      inRange: {
+        color: ['#ebedee', '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de']
+      }
+    },
+    calendar: {
+      top: 50,
+      left: 30,
+      right: 20,
+      cellSize: [Math.floor((container.offsetWidth - 50) / 7), 35],
+      range: selectedMonth.value,
+      itemStyle: {
+        borderWidth: 0.5,
+        borderColor: '#e0e0e0'
+      },
+      splitLine: {
+        show: true,
+        lineStyle: {
+          color: '#f0f0f0',
+          width: 1
+        }
+      },
+      yearLabel: { show: false },
+      monthLabel: {
+        color: '#333',
+        fontSize: 11,
+        nameMap: 'ZH'
+      },
+      dayLabel: {
+        firstDay: 1,
+        nameMap: ['日', '一', '二', '三', '四', '五', '六'],
+        fontSize: 10,
+        color: '#666'
+      }
+    },
+    series: [{
+      type: 'heatmap',
+      coordinateSystem: 'calendar',
+      label: {
+        show: true,
+        formatter: (params) => {
+          return params.data[0].split('-')[2];
+        },
+        fontSize: 10,
+        color: '#333'
+      },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 10,
+          shadowColor: 'rgba(0, 0, 0, 0.2)'
+        }
+      },
+      data: calendarData
+    }]
+  };
+
+  chart.setOption(option);
+}
+
+function renderStationChart() {
+  if (!statisticsChartRef.value) return;
+
+  const chart = echarts.init(statisticsChartRef.value);
+
+  // 合并出发和到达站点统计
+  const stationCountMap = new Map();
+
+  statisticsData.value.departures.forEach(item => {
+    const name = getStationName(item.station);
+    stationCountMap.set(item.station, {
+      name,
+      departure: item.count,
+      arrival: 0
+    });
+  });
+
+  statisticsData.value.arrivals.forEach(item => {
+    const name = getStationName(item.station);
+    if (stationCountMap.has(item.station)) {
+      stationCountMap.get(item.station).arrival = item.count;
+    } else {
+      stationCountMap.set(item.station, {
+        name,
+        departure: 0,
+        arrival: item.count
+      });
+    }
+  });
+
+  const sortedStations = [...stationCountMap.values()]
+    .sort((a, b) => (b.departure + b.arrival) - (a.departure + a.arrival))
+    .slice(0, 10);
+
+  const option = {
+    title: {
+      text: '最常到达站点统计',
+      left: 'center',
+      textStyle: { fontSize: 16, fontWeight: 'normal', color: '#17324d' }
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' }
+    },
+    legend: {
+      data: ['出发次数', '到达次数'],
+      bottom: 0
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      top: '15%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: sortedStations.map(s => s.name),
+      axisLabel: { rotate: 30, fontSize: 10 }
+    },
+    yAxis: {
+      type: 'value',
+      name: '次数'
+    },
+    series: [
+      {
+        name: '出发次数',
+        type: 'bar',
+        data: sortedStations.map(s => s.departure),
+        itemStyle: { color: '#5470c6' }
+      },
+      {
+        name: '到达次数',
+        type: 'bar',
+        data: sortedStations.map(s => s.arrival),
+        itemStyle: { color: '#91cc75' }
+      }
+    ]
+  };
+
+  chart.setOption(option);
+}
+
+function renderCityChart() {
+  if (!cityChartRef.value) return;
+
+  const chart = echarts.init(cityChartRef.value);
+
+  // 统计城市访问次数（出发+到达）
+  const cityCountMap = new Map();
+
+  statisticsData.value.departures.forEach(item => {
+    const city = getCityName(item.station);
+    if (city) {
+      cityCountMap.set(city, (cityCountMap.get(city) || 0) + item.count);
+    }
+  });
+
+  statisticsData.value.arrivals.forEach(item => {
+    const city = getCityName(item.station);
+    if (city) {
+      cityCountMap.set(city, (cityCountMap.get(city) || 0) + item.count);
+    }
+  });
+
+  const sortedCities = [...cityCountMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const option = {
+    title: {
+      text: '最常访问城市统计',
+      left: 'center',
+      textStyle: { fontSize: 16, fontWeight: 'normal', color: '#17324d' }
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c} 次'
+    },
+    series: [
+      {
+        name: '访问次数',
+        type: 'pie',
+        radius: '55%',
+        data: sortedCities.map(([name, value]) => ({ name, value })),
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        label: {
+          formatter: '{b}: {c}'
+        }
+      }
+    ]
+  };
+
+  chart.setOption(option);
 }
 
 const newUsername = ref('')
@@ -230,6 +593,11 @@ async function saveProfile() {
 onMounted(() => {
   refreshCaptcha();
   refreshDeleteCaptcha();
+  // 设置当前月份
+  const now = new Date();
+  selectedMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  loadStatistics();
+  loadMonthlyData();
 })
 
 async function handleDeleteAccount() {
@@ -403,18 +771,44 @@ async function handleDeleteAccount() {
   border-radius: 6px;
 }
 
-.coming-soon-card {
+.coming-soon-card,
+.statistics-card {
   margin-top: 20px;
   background: rgba(255, 255, 255, 0.4);
 }
 
-.coming-soon-card h3 {
-  margin: 0 0 8px;
+.statistics-card h3 {
+  margin: 0 0 16px;
 }
 
-.coming-soon-card p {
-  margin: 0;
-  color: #6b7785;
+.chart-container {
+  width: 100%;
+  height: 320px;
+  margin-bottom: 16px;
+}
+
+.calendar-wrapper {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.calendar-header span {
+  font-weight: 500;
+  color: #17324d;
+}
+
+.calendar-container {
+  width: 100%;
+  height: 260px;
 }
 
 @media (max-width: 900px) {
