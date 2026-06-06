@@ -15,8 +15,16 @@
         </el-aside>
         <el-main class="user-main">
           <section class="user-title-wrap">
-            <h1>账户设置</h1>
-            <p>修改头像、用户名、密码，删除账户</p>
+            <div class="title-content">
+              <div>
+                <h1>账户设置</h1>
+                <p>修改头像、用户名、密码，删除账户</p>
+              </div>
+              <el-button type="danger" @click="openDeleteDialog">
+                <el-icon><Delete /></el-icon>
+                删除账户
+              </el-button>
+            </div>
           </section>
 
           <div class="user-content-grid">
@@ -55,6 +63,38 @@
             </el-card>
           </div>
 
+          <el-dialog v-model="deleteDialogVisible" title="删除账户" width="450px" :close-on-click-modal="false">
+            <el-alert
+              title="删除账户后，所有数据将被永久清除且无法恢复"
+              type="error"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 20px;"
+            />
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="密码验证">
+                <el-input
+                  v-model="deletePassword"
+                  type="password"
+                  show-password
+                  placeholder="请输入当前密码"
+                  size="large"
+                  clearable
+                />
+              </el-form-item>
+              <el-form-item label="验证码">
+                <div class="captcha-group">
+                  <el-input-otp v-model="deleteCaptchaInput" :length="5" size="large"/>
+                  <img ref="deleteCaptchaImage" alt="点击刷新验证码" @click="refreshDeleteCaptcha" />
+                </div>
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="deleteDialogVisible = false">取消</el-button>
+              <el-button type="danger" :loading="deleting" @click="handleDeleteAccount">确认删除</el-button>
+            </template>
+          </el-dialog>
+
           <el-card class="coming-soon-card" shadow="never">
             <h3>个人运转数据</h3>
             <p>开发中</p>
@@ -67,8 +107,9 @@
 
 <script setup>
 import {useRouter} from "vue-router";
-import {onMounted, ref} from "vue";
-import { ElMessage } from "element-plus";
+import {onMounted, ref, nextTick} from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { Delete } from "@element-plus/icons-vue";
 import api from "@/api.js";
 import { drawCaptcha, generateCaptcha } from "@/utils/captcha.js";
 
@@ -88,10 +129,33 @@ const captchaImage = ref(null)
 const saving = ref(false)
 let currentCaptcha = ""
 
+const deletePassword = ref('')
+const deleteCaptchaInput = ref('')
+const deleteCaptchaImage = ref(null)
+const deleteDialogVisible = ref(false)
+const deleting = ref(false)
+let deleteCurrentCaptcha = ""
+
+function openDeleteDialog() {
+  deletePassword.value = ''
+  deleteCaptchaInput.value = ''
+  deleteDialogVisible.value = true
+  nextTick(() => {
+    refreshDeleteCaptcha()
+  })
+}
+
 function refreshCaptcha() {
   currentCaptcha = generateCaptcha();
   if (captchaImage.value) {
     captchaImage.value.src = drawCaptcha(currentCaptcha);
+  }
+}
+
+function refreshDeleteCaptcha() {
+  deleteCurrentCaptcha = generateCaptcha();
+  if (deleteCaptchaImage.value) {
+    deleteCaptchaImage.value.src = drawCaptcha(deleteCurrentCaptcha);
   }
 }
 
@@ -165,7 +229,94 @@ async function saveProfile() {
 
 onMounted(() => {
   refreshCaptcha();
+  refreshDeleteCaptcha();
 })
+
+async function handleDeleteAccount() {
+  const inputCode = deleteCaptchaInput.value.trim().toUpperCase();
+  if (inputCode !== deleteCurrentCaptcha) {
+    ElMessage.error("验证码错误，请重新输入！");
+    refreshDeleteCaptcha();
+    return;
+  }
+
+  const password = deletePassword.value.trim();
+  if (!password) {
+    ElMessage.warning("请输入当前密码");
+    return;
+  }
+
+  const userRaw = localStorage.getItem("user");
+  if (!userRaw) {
+    ElMessage.error("登录状态失效，请重新登录");
+    router.push("/login");
+    return;
+  }
+
+  let user;
+  try {
+    user = JSON.parse(userRaw);
+  } catch (e) {
+    ElMessage.error("用户信息读取失败，请重新登录");
+    router.push("/login");
+    return;
+  }
+
+  try {
+    deleting.value = true;
+    // 先验证密码
+    const response = await api.post("/user/delete-account", {
+      id: user.id,
+      password: password,
+      captcha: inputCode
+    });
+
+    if (!response.data.success) {
+      ElMessage.error(response.data.message || "验证失败，请稍后重试");
+      refreshDeleteCaptcha();
+      return;
+    }
+
+    // 验证码和密码通过后，弹出最终警告确认
+    try {
+      await ElMessageBox.confirm(
+        "此操作将永久删除您的账户及所有数据，且不可恢复！确定要继续吗？",
+        "危险操作确认",
+        {
+          confirmButtonText: "确认删除",
+          cancelButtonText: "取消",
+          type: "error",
+          confirmButtonClass: "el-button--danger"
+        }
+      );
+    } catch {
+      // 用户取消操作
+      deleting.value = false;
+      return;
+    }
+
+    // 用户确认后执行删除
+    const deleteResponse = await api.post("/user/confirm-delete", {
+      id: user.id
+    });
+
+    if (deleteResponse.data.success) {
+      ElMessage.success("账户已删除");
+      localStorage.removeItem("user");
+      localStorage.removeItem("login");
+      deleteDialogVisible.value = false;
+      router.push("/");
+      return;
+    }
+
+    ElMessage.error(deleteResponse.data.message || "删除失败，请稍后重试");
+  } catch (err) {
+    console.error(err);
+    ElMessage.error("请求失败，请检查网络");
+  } finally {
+    deleting.value = false;
+  }
+}
 
 </script>
 
@@ -194,13 +345,23 @@ onMounted(() => {
   padding: 28px;
 }
 
-.user-title-wrap h1 {
+.user-title-wrap {
+  margin-bottom: 20px;
+}
+
+.title-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.title-content h1 {
   margin: 0 0 8px;
   font-size: 32px;
   color: #17324d;
 }
 
-.user-title-wrap p {
+.title-content p {
   margin: 0;
   color: #5f6f81;
 }
